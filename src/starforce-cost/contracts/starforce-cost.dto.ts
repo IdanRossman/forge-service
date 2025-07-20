@@ -223,3 +223,52 @@ export class StarforceAttemptDto {
   })
   safeguardCost?: number;
 }
+
+export class BulkStarforceRequestDto {
+  @ApiProperty({
+    description: 'Array of starforce calculation requests',
+    type: [StarforceCostRequestDto],
+    example: [
+      {
+        currentStar: 12,
+        targetStar: 17,
+        itemLevel: 200,
+        useFever: false,
+        useEvent: false,
+        useSafeguard: false,
+      },
+      {
+        currentStar: 15,
+        targetStar: 22,
+        itemLevel: 200,
+        useFever: true,
+        useEvent: false,
+        useSafeguard: true,
+      },
+    ],
+  })
+  calculations: StarforceCostRequestDto[];
+}
+
+export class BulkStarforceResponseDto {
+  @ApiProperty({
+    description:
+      'Array of starforce calculation results corresponding to input requests',
+    type: [StarforceCostResponseDto],
+  })
+  results: StarforceCostResponseDto[];
+
+  @ApiProperty({
+    description: 'Summary statistics for all calculations combined',
+    example: {
+      totalExpectedCost: 15000000000,
+      totalExpectedAttempts: 250,
+      totalCalculations: 2,
+    },
+  })
+  summary: {
+    totalExpectedCost: number;
+    totalExpectedAttempts: number;
+    totalCalculations: number;
+  };
+}

@@ -13,20 +13,27 @@ import {
   Equipment,
 } from '../database/services/supabase.service';
 
-@ApiTags('equipment')
-@Controller('equipment')
+@ApiTags('Equipment')
+@Controller('Equipment')
 export class EquipmentController {
   constructor(private readonly supabaseService: SupabaseService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all equipment, optionally filtered by type' })
-  @ApiQuery({ name: 'type', required: false, description: 'Filter by equipment type (optional)' })
-  @ApiResponse({ status: 200, description: 'Return all equipment or equipment of specified type.' })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Filter by equipment type (optional)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all equipment or equipment of specified type.',
+  })
   async getAllEquipment(@Query('type') type?: string): Promise<Equipment[]> {
     if (type) {
       // Use the existing method in a filtered way
       const allEquipment = await this.supabaseService.getAllEquipment();
-      return allEquipment.filter(equipment => equipment.type === type);
+      return allEquipment.filter((equipment) => equipment.type === type);
     }
     return this.supabaseService.getAllEquipment();
   }

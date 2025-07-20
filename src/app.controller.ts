@@ -1,22 +1,17 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Health')
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
-
   @Get()
-  getHello() {
+  @ApiOperation({ summary: 'API Health Check' })
+  getHealth() {
     return {
-      message: this.appService.getHello(),
       status: 'healthy',
+      service: 'Forge Service API',
+      version: '1.0.0',
       timestamp: new Date().toISOString(),
-      environment: {
-        nodeEnv: process.env.NODE_ENV,
-        port: process.env.PORT,
-        hasSupabaseUrl: !!process.env.SUPABASE_URL,
-        hasSupabaseKey: !!process.env.SUPABASE_ANON_KEY,
-      },
     };
   }
 }

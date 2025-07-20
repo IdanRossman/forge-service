@@ -184,4 +184,38 @@ export class StarforceCostService {
 
     return stats;
   }
+
+  /**
+   * Calculate starforce costs for multiple equipment items in bulk
+   */
+  calculateBulk(calculations: StarforceCostRequestDto[]): {
+    results: StarforceCostResponseDto[];
+    summary: {
+      totalExpectedCost: number;
+      totalExpectedAttempts: number;
+      totalCalculations: number;
+    };
+  } {
+    const results: StarforceCostResponseDto[] = [];
+    let totalExpectedCost = 0;
+    let totalExpectedAttempts = 0;
+
+    // Process each calculation
+    for (const calculation of calculations) {
+      const result = this.calculateStarforceCost(calculation);
+      results.push(result);
+      totalExpectedCost += result.averageCost;
+      // Calculate attempts from average cost and cost per attempt
+      totalExpectedAttempts += result.averageCost / result.costPerAttempt;
+    }
+
+    return {
+      results,
+      summary: {
+        totalExpectedCost: Math.round(totalExpectedCost),
+        totalExpectedAttempts: Math.round(totalExpectedAttempts),
+        totalCalculations: calculations.length,
+      },
+    };
+  }
 }

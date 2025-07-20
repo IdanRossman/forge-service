@@ -1,19 +1,12 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  ParseIntPipe,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   SupabaseService,
   EquipmentTemplate,
 } from '../database/services/supabase.service';
 
-@ApiTags('templates')
-@Controller('templates')
+@ApiTags('Templates')
+@Controller('Templates')
 export class TemplatesController {
   constructor(private readonly supabaseService: SupabaseService) {}
 
