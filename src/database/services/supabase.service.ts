@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -6,26 +9,20 @@ export interface Equipment {
   id?: number;
   name: string;
   type: string;
-  slot: string;
   set?: string;
   job?: string;
   class?: string;
-  level: number;
+  level?: number;
   base_attack?: number;
   starforceable?: boolean;
-  max_stars?: number;
-  superior?: boolean;
   maplestory_io_id?: string;
-  created_at?: string;
-  updated_at?: string;
+  storage_url?: string;
 }
 
 export interface EquipmentTemplate {
   id?: number;
   name: string;
   description?: string;
-  default_template?: boolean;
-  is_public?: boolean;
   hat_id?: number;
   top_id?: number;
   bottom_id?: number;
@@ -49,8 +46,6 @@ export interface EquipmentTemplate {
   badge_id?: number;
   heart_id?: number;
   pocket_id?: number;
-  created_at?: string;
-  updated_at?: string;
 }
 
 @Injectable()
@@ -72,14 +67,23 @@ export class SupabaseService {
     return this.supabase;
   }
 
+  // Equipment methods
   async getAllEquipment(): Promise<Equipment[]> {
+    console.log('🔍 Fetching all equipment...');
     const { data, error } = await this.supabase
       .from('equipment')
       .select('*')
       .order('name');
 
-    if (error) throw error;
-    return data || [];
+    console.log('📊 Supabase response:', { data, error });
+    
+    if (error) {
+      console.error('❌ Supabase error:', error);
+      throw error;
+    }
+    
+    console.log('✅ Equipment data retrieved:', data?.length || 0, 'items');
+    return (data as Equipment[]) || [];
   }
 
   async getEquipmentById(id: number): Promise<Equipment | null> {
@@ -90,7 +94,35 @@ export class SupabaseService {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as Equipment | null;
+  }
+
+  async getStarforceableEquipment(): Promise<Equipment[]> {
+    const { data, error } = await this.supabase
+      .from('equipment')
+      .select('*')
+      .eq('starforceable', true)
+      .order('name');
+
+    if (error) throw error;
+    return (data as Equipment[]) || [];
+  }
+
+  // Get equipment by type
+  async getEquipmentByType(type: string): Promise<Equipment[]> {
+    const { data, error } = await this.supabase
+      .from('equipment')
+      .select('*')
+      .eq('type', type)
+      .order('name');
+
+    if (error) throw error;
+    return (data as Equipment[]) || [];
+  }
+
+  // Alternative method name for equipment by type
+  async findEquipmentByType(type: string): Promise<Equipment[]> {
+    return this.getEquipmentByType(type);
   }
 
   async createEquipment(equipment: Omit<Equipment, 'id'>): Promise<Equipment> {
@@ -101,9 +133,37 @@ export class SupabaseService {
       .single();
 
     if (error) throw error;
-    return data;
+    if (!data) throw new Error('Failed to create equipment');
+    return data as Equipment;
   }
 
+  async updateEquipment(
+    id: number,
+    equipment: Partial<Equipment>,
+  ): Promise<Equipment> {
+    const { data, error } = await this.supabase
+      .from('equipment')
+      .update(equipment)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to update equipment');
+    return data as Equipment;
+  }
+
+  async deleteEquipment(id: number): Promise<boolean> {
+    const { error } = await this.supabase
+      .from('equipment')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  }
+
+  // Equipment Template methods
   async getAllTemplates(): Promise<EquipmentTemplate[]> {
     const { data, error } = await this.supabase
       .from('equipment_template')
@@ -111,7 +171,18 @@ export class SupabaseService {
       .order('name');
 
     if (error) throw error;
-    return data || [];
+    return (data as EquipmentTemplate[]) || [];
+  }
+
+  async getTemplateById(id: number): Promise<EquipmentTemplate | null> {
+    const { data, error } = await this.supabase
+      .from('equipment_template')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    return data as EquipmentTemplate | null;
   }
 
   async createTemplate(
@@ -124,6 +195,47 @@ export class SupabaseService {
       .single();
 
     if (error) throw error;
-    return data;
+    if (!data) throw new Error('Failed to create template');
+    return data as EquipmentTemplate;
+  }
+
+  async updateTemplate(
+    id: number,
+    template: Partial<EquipmentTemplate>,
+  ): Promise<EquipmentTemplate> {
+    const { data, error } = await this.supabase
+      .from('equipment_template')
+      .update(template)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to update template');
+    return data as EquipmentTemplate;
+  }
+
+  async deleteTemplate(id: number): Promise<boolean> {
+    const { error } = await this.supabase
+      .from('equipment_template')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  }
+
+  // Search methods
+  async searchEquipment(searchTerm: string): Promise<Equipment[]> {
+    const { data, error } = await this.supabase
+      .from('equipment')
+      .select('*')
+      .or(
+        `name.ilike.%${searchTerm}%,type.ilike.%${searchTerm}%,slot.ilike.%${searchTerm}%`,
+      )
+      .order('name');
+
+    if (error) throw error;
+    return (data as Equipment[]) || [];
   }
 }
