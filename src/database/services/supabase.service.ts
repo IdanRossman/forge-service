@@ -4,13 +4,14 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { getClassByJob } from '../../equipment/job-class-mapping';
 
 export interface Equipment {
   id?: number;
   name: string;
   type: string;
   set?: string;
-  job?: string;
+  job?: string[];
   class?: string;
   level?: number;
   base_attack?: number;
@@ -123,6 +124,25 @@ export class SupabaseService {
   // Alternative method name for equipment by type
   async findEquipmentByType(type: string): Promise<Equipment[]> {
     return this.getEquipmentByType(type);
+  }
+
+  // Get equipment by job and type (filters by type and class compatibility)
+  async getEquipmentByJobAndType(job: string, type: string): Promise<Equipment[]> {
+    const characterClass = getClassByJob(job);
+    
+    if (!characterClass) {
+      throw new Error(`Invalid job: ${job}`);
+    }
+
+    const { data, error } = await this.supabase
+      .from('equipment')
+      .select('*')
+      .eq('type', type)
+      .or(`class.eq.common,and(class.eq.${characterClass},job.is.null),and(class.eq.${characterClass},job.eq.{}),job.cs.{${job}}`)
+      .order('level', { ascending: true });
+
+    if (error) throw error;
+    return (data as Equipment[]) || [];
   }
 
   async createEquipment(equipment: Omit<Equipment, 'id'>): Promise<Equipment> {

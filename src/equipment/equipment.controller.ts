@@ -6,12 +6,14 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   SupabaseService,
   Equipment,
 } from '../database/services/supabase.service';
+import { isValidJob } from './job-class-mapping';
 
 @ApiTags('Equipment')
 @Controller('Equipment')
@@ -56,5 +58,29 @@ export class EquipmentController {
     @Body() equipment: Omit<Equipment, 'id'>,
   ): Promise<Equipment> {
     return this.supabaseService.createEquipment(equipment);
+  }
+
+  @Get('type/:type/job/:job')
+  @ApiOperation({ 
+    summary: 'Get equipment by type filtered by job',
+    description: 'Returns equipment of a specific type that can be used by the specified job (includes common and class-specific items)'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Return equipment for the specified type and job.',
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Invalid type or job specified.' 
+  })
+  async getEquipmentByTypeAndJob(
+    @Param('type') type: string,
+    @Param('job') job: string,
+  ): Promise<Equipment[]> {
+    if (!isValidJob(job)) {
+      throw new BadRequestException(`Invalid job: ${job}`);
+    }
+
+    return this.supabaseService.getEquipmentByJobAndType(job, type);
   }
 }
