@@ -77,12 +77,12 @@ export class SupabaseService {
       .order('name');
 
     console.log('📊 Supabase response:', { data, error });
-    
+
     if (error) {
       console.error('❌ Supabase error:', error);
       throw error;
     }
-    
+
     console.log('✅ Equipment data retrieved:', data?.length || 0, 'items');
     return (data as Equipment[]) || [];
   }
@@ -126,23 +126,28 @@ export class SupabaseService {
     return this.getEquipmentByType(type);
   }
 
-  // Get equipment by job and type (filters by type and class compatibility)
-  async getEquipmentByJobAndType(job: string, type: string): Promise<Equipment[]> {
+  // Get equipment by job and type (filters by type and job compatibility)
+  async getEquipmentByJobAndType(type: string, job: string) {
     const characterClass = getClassByJob(job);
-    
+
     if (!characterClass) {
       throw new Error(`Invalid job: ${job}`);
     }
-
     const { data, error } = await this.supabase
       .from('equipment')
       .select('*')
       .eq('type', type)
-      .or(`class.eq.common,and(class.eq.${characterClass},job.is.null),and(class.eq.${characterClass},job.eq.{}),job.cs.{${job}}`)
+      .or(
+        `class.eq.common,and(class.eq.${characterClass},job.is.null),and(class.eq.${characterClass},job.eq.{}),job.cs.{${job}},and(class.eq.unique,job.cs.{${job}})`,
+      )
       .order('level', { ascending: true });
 
-    if (error) throw error;
-    return (data as Equipment[]) || [];
+    if (error) {
+      console.error('Error fetching equipment:', error);
+      throw error;
+    }
+
+    return data;
   }
 
   async createEquipment(equipment: Omit<Equipment, 'id'>): Promise<Equipment> {

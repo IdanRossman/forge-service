@@ -6,12 +6,18 @@ async function bootstrap() {
   try {
     console.log('🚀 Starting Forge Service...');
     console.log('Environment variables check:');
-    console.log('- SUPABASE_URL:', process.env.SUPABASE_URL ? '✅ Set' : '❌ Missing');
-    console.log('- SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing');
+    console.log(
+      '- SUPABASE_URL:',
+      process.env.SUPABASE_URL ? '✅ Set' : '❌ Missing',
+    );
+    console.log(
+      '- SUPABASE_ANON_KEY:',
+      process.env.SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing',
+    );
     console.log('- PORT:', process.env.PORT || '3000 (default)');
 
     const app = await NestFactory.create(AppModule);
-    
+
     // Enable CORS
     app.enableCors();
 

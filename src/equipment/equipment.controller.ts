@@ -61,17 +61,18 @@ export class EquipmentController {
   }
 
   @Get('type/:type/job/:job')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get equipment by type filtered by job',
-    description: 'Returns equipment of a specific type that can be used by the specified job (includes common and class-specific items)'
+    description:
+      'Returns equipment of a specific type that can be used by the specified job (includes common and class-specific items)',
   })
   @ApiResponse({
     status: 200,
     description: 'Return equipment for the specified type and job.',
   })
-  @ApiResponse({ 
-    status: 400, 
-    description: 'Invalid type or job specified.' 
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid type or job specified.',
   })
   async getEquipmentByTypeAndJob(
     @Param('type') type: string,
@@ -81,6 +82,6 @@ export class EquipmentController {
       throw new BadRequestException(`Invalid job: ${job}`);
     }
 
-    return this.supabaseService.getEquipmentByJobAndType(job, type);
+    return this.supabaseService.getEquipmentByJobAndType(type, job);
   }
 }
