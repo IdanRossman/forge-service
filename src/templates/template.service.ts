@@ -26,6 +26,8 @@ export interface TemplateSlot {
 
 @Injectable()
 export class TemplateService {
+  private tableWarningShown = false;
+  
   private readonly SLOT_MAPPINGS = {
     hat: 'hat_set_id',
     top: 'top_set_id',
@@ -180,8 +182,8 @@ export class TemplateService {
         storage_url: equipment.storage_url || '',
         class: equipment.class || '',
         job: equipment.job || [],
-        current_starforce: templateInfo?.current_starforce,
-        target_starforce: templateInfo?.target_starforce
+        current_starforce: templateInfo?.current_starforce ?? 0,
+        target_starforce: templateInfo?.target_starforce ?? 0
       };
     } catch (error) {
       console.error(`Error getting equipment for slot ${slot.slot_name}:`, error);
@@ -225,9 +227,22 @@ export class TemplateService {
       .eq('slot_name', slotName)
       .single();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
+      // No record found - this is expected and normal
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      // Table doesn't exist - warn once on first occurrence
+      if (error.code === '42P01') {
+        if (!this.tableWarningShown) {
+          console.warn('⚠️  equipment_template_info table does not exist. Starforce values will default to 0.');
+          this.tableWarningShown = true;
+        }
+        return null;
+      }
+      // Other errors
       console.error('Error fetching template info:', error);
-      // Don't throw, just return null for missing template info
+      return null;
     }
     
     return data;
