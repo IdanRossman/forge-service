@@ -3,7 +3,6 @@
  */
 
 export type Server = 'gms' | 'kms' | 'msea';
-export type ItemType = 'regular' | 'superior';
 
 export interface EventConfiguration {
   thirtyOff?: boolean;
@@ -11,6 +10,21 @@ export interface EventConfiguration {
   starCatching?: boolean;
   mvpDiscount?: number;
   yohiTapEvent?: boolean;
+}
+
+export interface StarForceCalculation {
+  currentLevel: number;
+  targetLevel: number;
+  averageCost: number;
+  medianCost: number;
+  p75Cost: number;
+  averageBooms: number;
+  medianBooms: number;
+  p75Booms: number;
+  // Add cost results for percentile analysis (optional)
+  costResults?: number[];
+  // Add boom results for spare planning (optional)
+  boomResults?: number[];
 }
 
 export type StarforceOutcome = 'Success' | 'Maintain' | 'Decrease' | 'Boom';
@@ -266,58 +280,181 @@ export function performEnhancementExperiment(
 }
 
 /**
- * Generate enhancement recommendations
+ * Calculate what percentile an actual cost falls into
  */
-export function generateRecommendations(
-  currentStars: number,
-  targetStars: number,
-  averageCost: number,
-  averageBooms: number,
-  events: EventConfiguration,
-  safeguardEnabled: boolean,
-): string[] {
-  const recommendations: string[] = [];
+export function calculateCostPercentile(
+  actualCost: number,
+  costResults: number[],
+): {
+  percentile: number;
+  luckRating: 'Very Lucky' | 'Lucky' | 'Average' | 'Unlucky' | 'Very Unlucky';
+  description: string;
+  betterThanPercent: number;
+  worseThanPercent: number;
+} {
+  const sortedCosts = [...costResults].sort((a, b) => a - b);
+  const totalTrials = sortedCosts.length;
 
-  if (averageBooms > 0.5 && !safeguardEnabled && targetStars >= 15) {
-    recommendations.push(
-      'Consider using Safeguard for stars 15-16 to prevent destruction.',
-    );
+  // Find how many results were worse (higher cost) than the actual cost
+  const betterThanActual = sortedCosts.filter(
+    (cost) => cost < actualCost,
+  ).length;
+  const worseThanActual = sortedCosts.filter(
+    (cost) => cost > actualCost,
+  ).length;
+
+  // Calculate percentile (what percentage of results were worse than actual)
+  const percentile = Math.round((betterThanActual / totalTrials) * 10000) / 100;
+  const worseThanPercent =
+    Math.round((worseThanActual / totalTrials) * 10000) / 100;
+  const betterThanPercent = percentile;
+
+  // Determine luck rating
+  let luckRating:
+    | 'Very Lucky'
+    | 'Lucky'
+    | 'Average'
+    | 'Unlucky'
+    | 'Very Unlucky';
+  let description: string;
+
+  if (percentile <= 10) {
+    luckRating = 'Very Lucky';
+    description = `🍀 Extremely lucky! Your cost was lower than ${percentile}% of all attempts`;
+  } else if (percentile <= 25) {
+    luckRating = 'Lucky';
+    description = `✨ Lucky! Your cost was lower than ${percentile}% of all attempts`;
+  } else if (percentile <= 75) {
+    luckRating = 'Average';
+    description = `📊 Average luck. Your cost was around the ${percentile}th percentile`;
+  } else if (percentile <= 90) {
+    luckRating = 'Unlucky';
+    description = `😬 Unlucky. Your cost was higher than ${betterThanPercent}% of attempts`;
+  } else {
+    luckRating = 'Very Unlucky';
+    description = `💸 Very unlucky! Your cost was higher than ${betterThanPercent}% of attempts`;
   }
 
-  if (averageCost > 500000000 && !events.thirtyOff) {
-    recommendations.push(
-      'Wait for a 30% Off event to significantly reduce costs.',
-    );
-  }
-
-  const sparesNeeded = Math.ceil(averageBooms);
-  if (sparesNeeded > 0) {
-    recommendations.push(
-      `Expected ${averageBooms.toFixed(1)} booms - prepare ${sparesNeeded} spare item${sparesNeeded > 1 ? 's' : ''}.`,
-    );
-  }
-
-  if (targetStars >= 22 && !events.starCatching) {
-    recommendations.push(
-      'Star Catching is highly recommended for 22+ star attempts.',
-    );
-  }
-
-  if (events.yohiTapEvent) {
-    recommendations.push(
-      '🍀 Yohi Tap Event is active - all costs and spares have been halved due to supernatural luck!',
-    );
-  }
-
-  return recommendations;
+  return {
+    percentile,
+    luckRating,
+    description,
+    betterThanPercent,
+    worseThanPercent,
+  };
 }
 
 /**
- * Format mesos for display
+ * Main starforce calculation function - matches frontend implementation exactly
  */
-export function formatMesos(amount: number): string {
-  if (amount >= 1000000000) return `${(amount / 1000000000).toFixed(1)}B`;
-  if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
-  if (amount >= 1000) return `${(amount / 1000).toFixed(1)}K`;
-  return amount.toString();
+export function calculateStarForce(
+  itemLevel: number,
+  currentLevel: number,
+  targetLevel: number,
+  events: {
+    costMultiplier?: number;
+    successRateBonus?: number;
+    starCatching?: boolean;
+    safeguard?: boolean;
+    thirtyOff?: boolean;
+    fiveTenFifteen?: boolean;
+    mvpDiscount?: number;
+  } = {},
+  returnCostResults = false, // New parameter to control if we return full cost results
+): StarForceCalculation {
+  const {
+    costMultiplier = 1,
+    successRateBonus = 0,
+    starCatching = false,
+    safeguard = false,
+    thirtyOff = false,
+    fiveTenFifteen = false,
+    mvpDiscount = 0,
+  } = events || {};
+
+  // Input validation
+  if (
+    currentLevel >= targetLevel ||
+    itemLevel < 1 ||
+    targetLevel > 25 ||
+    currentLevel < 0
+  ) {
+    return {
+      currentLevel,
+      targetLevel,
+      averageCost: 0,
+      medianCost: 0,
+      p75Cost: 0,
+      averageBooms: 0,
+      medianBooms: 0,
+      p75Booms: 0,
+    };
+  }
+
+  const trials = targetLevel <= 22 ? 1000 : 250; // Dynamic trials: more accuracy for lower stars, performance for 22+ stars
+  const costResults: number[] = []; // Store all cost results for median calculation
+  const boomResults: number[] = []; // Store all boom results for median calculation
+
+  // Convert events to EventConfiguration format
+  const eventConfig: EventConfiguration = {
+    thirtyOff: thirtyOff || costMultiplier < 1,
+    fiveTenFifteen: fiveTenFifteen || successRateBonus > 0,
+    starCatching,
+    mvpDiscount,
+  };
+
+  const server: Server = 'gms'; // Default to GMS
+
+  // Run simulations using Brandon's exact algorithm
+  for (let i = 0; i < trials; i++) {
+    // Each trial gets both meso and boom data from the same experiment
+    const { totalCost, totalBooms } = performEnhancementExperiment(
+      currentLevel,
+      targetLevel,
+      itemLevel,
+      eventConfig,
+      safeguard,
+      server,
+    );
+    costResults.push(totalCost);
+    boomResults.push(totalBooms);
+  }
+
+  // Calculate average values
+  const avgCost = costResults.reduce((sum, cost) => sum + cost, 0) / trials;
+  const avgBooms = boomResults.reduce((sum, booms) => sum + booms, 0) / trials;
+
+  // Calculate median values
+  const sortedCosts = [...costResults].sort((a, b) => a - b);
+  const sortedBooms = [...boomResults].sort((a, b) => a - b);
+
+  const medianCost =
+    trials % 2 === 0
+      ? (sortedCosts[trials / 2 - 1] + sortedCosts[trials / 2]) / 2
+      : sortedCosts[Math.floor(trials / 2)];
+
+  const medianBooms =
+    trials % 2 === 0
+      ? (sortedBooms[trials / 2 - 1] + sortedBooms[trials / 2]) / 2
+      : sortedBooms[Math.floor(trials / 2)];
+
+  // Calculate 75th percentile values
+  const p75Index = Math.floor(trials * 0.75);
+  const p75Cost = sortedCosts[p75Index];
+  const p75Booms = sortedBooms[p75Index];
+
+  return {
+    currentLevel,
+    targetLevel,
+    averageCost: Math.round(avgCost),
+    averageBooms: Math.round(avgBooms * 100) / 100,
+    medianCost: Math.round(medianCost),
+    medianBooms: Math.round(medianBooms * 100) / 100,
+    p75Cost: Math.round(p75Cost),
+    p75Booms: Math.round(p75Booms * 100) / 100,
+    // Only include cost results if requested (for percentile analysis)
+    costResults: returnCostResults ? costResults : undefined,
+    // Only include boom results if requested (for spare planning)
+    boomResults: returnCostResults ? boomResults : undefined,
+  };
 }

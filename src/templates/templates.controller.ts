@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Post, Param, Query } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import {
   SupabaseService,
   EquipmentTemplate,
@@ -34,7 +40,11 @@ export class TemplatesController {
   @Get(':id/equipment')
   @ApiOperation({ summary: 'Get equipment for a template' })
   @ApiParam({ name: 'id', description: 'Template ID' })
-  @ApiQuery({ name: 'job', required: false, description: 'Job class (default: bishop)' })
+  @ApiQuery({
+    name: 'job',
+    required: false,
+    description: 'Job class (default: bishop)',
+  })
   @ApiResponse({ status: 200, description: 'Return template equipment.' })
   @ApiResponse({ status: 404, description: 'Template not found.' })
   async getTemplateEquipment(
@@ -51,12 +61,16 @@ export class TemplatesController {
   @Get(':id/validate')
   @ApiOperation({ summary: 'Validate template completeness' })
   @ApiParam({ name: 'id', description: 'Template ID' })
-  @ApiQuery({ name: 'job', required: false, description: 'Job class (default: bishop)' })
+  @ApiQuery({
+    name: 'job',
+    required: false,
+    description: 'Job class (default: bishop)',
+  })
   @ApiResponse({ status: 200, description: 'Return validation result.' })
   async validateTemplate(
     @Param('id') id: string,
     @Query('job') job: string = 'bishop',
-  ): Promise<{valid: boolean, missingSlots: string[]}> {
+  ): Promise<{ valid: boolean; missingSlots: string[] }> {
     const templateId = parseInt(id, 10);
     if (isNaN(templateId)) {
       throw new Error('Invalid template ID');

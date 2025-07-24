@@ -27,7 +27,7 @@ export interface TemplateSlot {
 @Injectable()
 export class TemplateService {
   private tableWarningShown = false;
-  
+
   private readonly SLOT_MAPPINGS = {
     hat: 'hat_set_id',
     top: 'top_set_id',
@@ -51,12 +51,15 @@ export class TemplateService {
     emblem: 'emblem_set_id',
     badge: 'badge_set_id',
     heart: 'heart_set_id',
-    pocket: 'pocket_set_id'
+    pocket: 'pocket_set_id',
   };
 
   constructor(private supabaseService: SupabaseService) {}
 
-  async getTemplateEquipment(templateId: number, job: string = 'bishop'): Promise<TemplateEquipmentResult[]> {
+  async getTemplateEquipment(
+    templateId: number,
+    job: string = 'bishop',
+  ): Promise<TemplateEquipmentResult[]> {
     // 1. Get template data with set information
     const template = await this.getTemplateWithSets(templateId);
     if (!template) {
@@ -71,12 +74,12 @@ export class TemplateService {
     }
 
     // 3. Get equipment for each slot in parallel
-    const equipmentPromises = activeSlots.map(slot => 
-      this.getEquipmentForSlot(slot, job, templateId)
+    const equipmentPromises = activeSlots.map((slot) =>
+      this.getEquipmentForSlot(slot, job, templateId),
     );
 
     const equipmentResults = await Promise.all(equipmentPromises);
-    
+
     // 4. Filter out nulls and return results
     return equipmentResults.filter(Boolean) as TemplateEquipmentResult[];
   }
@@ -84,7 +87,7 @@ export class TemplateService {
   private async getTemplateWithSets(templateId: number) {
     // Use the existing SupabaseService method that has proper RLS context
     const template = await this.supabaseService.getTemplateById(templateId);
-    
+
     if (!template) {
       return null;
     }
@@ -115,7 +118,7 @@ export class TemplateService {
 
     // Create a map of set ID to set data
     const setMap = new Map();
-    sets?.forEach(set => {
+    sets?.forEach((set) => {
       setMap.set(set.id, set);
     });
 
@@ -133,7 +136,7 @@ export class TemplateService {
 
   private getActiveSlots(template: any): TemplateSlot[] {
     const activeSlots: TemplateSlot[] = [];
-    
+
     for (const [slotName, setIdField] of Object.entries(this.SLOT_MAPPINGS)) {
       const setData = template[`${slotName}_set`];
       if (setData?.set && setData?.id) {
@@ -141,11 +144,11 @@ export class TemplateService {
           slot_name: slotName,
           set_id: setData.id,
           set_name: setData.set,
-          base_type: this.getBaseType(slotName)
+          base_type: this.getBaseType(slotName),
         });
       }
     }
-    
+
     return activeSlots;
   }
 
@@ -156,20 +159,29 @@ export class TemplateService {
   }
 
   private async getEquipmentForSlot(
-    slot: TemplateSlot, 
-    job: string, 
-    templateId: number
+    slot: TemplateSlot,
+    job: string,
+    templateId: number,
   ): Promise<TemplateEquipmentResult | null> {
     try {
       // Get best equipment for this slot
-      const equipment = await this.getBestEquipmentForSlot(slot.set_name, slot.base_type, job);
+      const equipment = await this.getBestEquipmentForSlot(
+        slot.set_name,
+        slot.base_type,
+        job,
+      );
       if (!equipment) {
-        console.warn(`No equipment found for slot: ${slot.slot_name}, set: ${slot.set_name}, type: ${slot.base_type}, job: ${job}`);
+        console.warn(
+          `No equipment found for slot: ${slot.slot_name}, set: ${slot.set_name}, type: ${slot.base_type}, job: ${job}`,
+        );
         return null;
       }
 
       // Get template info for this slot
-      const templateInfo = await this.getTemplateInfo(templateId, slot.slot_name);
+      const templateInfo = await this.getTemplateInfo(
+        templateId,
+        slot.slot_name,
+      );
 
       return {
         slot_name: slot.slot_name,
@@ -183,17 +195,24 @@ export class TemplateService {
         class: equipment.class || '',
         job: equipment.job || [],
         current_starforce: templateInfo?.current_starforce ?? 0,
-        target_starforce: templateInfo?.target_starforce ?? 0
+        target_starforce: templateInfo?.target_starforce ?? 0,
       };
     } catch (error) {
-      console.error(`Error getting equipment for slot ${slot.slot_name}:`, error);
+      console.error(
+        `Error getting equipment for slot ${slot.slot_name}:`,
+        error,
+      );
       return null;
     }
   }
 
-  private async getBestEquipmentForSlot(setName: string, equipmentType: string, job: string) {
+  private async getBestEquipmentForSlot(
+    setName: string,
+    equipmentType: string,
+    job: string,
+  ) {
     const characterClass = getClassByJob(job);
-    
+
     if (!characterClass) {
       throw new Error(`Invalid job: ${job}`);
     }
@@ -205,7 +224,7 @@ export class TemplateService {
       .eq('set', setName)
       .eq('type', equipmentType)
       .or(
-        `class.eq.common,and(class.eq.${characterClass},job.is.null),and(class.eq.${characterClass},job.cs.{${job}}),and(class.eq.unique,job.cs.{${job}})`
+        `class.eq.common,and(class.eq.${characterClass},job.is.null),and(class.eq.${characterClass},job.cs.{${job}}),and(class.eq.unique,job.cs.{${job}})`,
       )
       .order('class', { ascending: false }) // Prioritize unique > class-specific > common
       .order('level', { ascending: false })
@@ -215,7 +234,7 @@ export class TemplateService {
       console.error('Error fetching equipment for slot:', error);
       throw error;
     }
-    
+
     return data?.[0];
   }
 
@@ -235,7 +254,9 @@ export class TemplateService {
       // Table doesn't exist - warn once on first occurrence
       if (error.code === '42P01') {
         if (!this.tableWarningShown) {
-          console.warn('⚠️  equipment_template_info table does not exist. Starforce values will default to 0.');
+          console.warn(
+            '⚠️  equipment_template_info table does not exist. Starforce values will default to 0.',
+          );
           this.tableWarningShown = true;
         }
         return null;
@@ -244,7 +265,7 @@ export class TemplateService {
       console.error('Error fetching template info:', error);
       return null;
     }
-    
+
     return data;
   }
 
@@ -254,16 +275,25 @@ export class TemplateService {
     if (!template) return [];
 
     const activeSlots = this.getActiveSlots(template);
-    return [...new Set(activeSlots.map(slot => slot.set_name))];
+    return [...new Set(activeSlots.map((slot) => slot.set_name))];
   }
 
   // Helper method to validate template completeness
-  async validateTemplate(templateId: number, job: string): Promise<{valid: boolean, missingSlots: string[]}> {
-    const activeSlots = await this.getActiveSlots(await this.getTemplateWithSets(templateId));
+  async validateTemplate(
+    templateId: number,
+    job: string,
+  ): Promise<{ valid: boolean; missingSlots: string[] }> {
+    const activeSlots = await this.getActiveSlots(
+      await this.getTemplateWithSets(templateId),
+    );
     const missingSlots: string[] = [];
 
     for (const slot of activeSlots) {
-      const equipment = await this.getBestEquipmentForSlot(slot.set_name, slot.base_type, job);
+      const equipment = await this.getBestEquipmentForSlot(
+        slot.set_name,
+        slot.base_type,
+        job,
+      );
       if (!equipment) {
         missingSlots.push(slot.slot_name);
       }
@@ -271,7 +301,7 @@ export class TemplateService {
 
     return {
       valid: missingSlots.length === 0,
-      missingSlots
+      missingSlots,
     };
   }
 }
