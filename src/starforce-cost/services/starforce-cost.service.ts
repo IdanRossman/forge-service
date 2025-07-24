@@ -1,221 +1,150 @@
 import { Injectable } from '@nestjs/common';
 import {
-  StarforceCostRequestDto,
-  StarforceCostResponseDto,
-  StarforcePerStarStatsDto,
+  EnhancedStarforceCostRequestDto,
+  EnhancedStarforceCostResponseDto,
+  BulkEnhancedStarforceRequestDto,
+  BulkEnhancedStarforceResponseDto,
 } from '../contracts';
-import {
-  performEnhancementExperiment,
-  generateRecommendations,
-  getStarforceRates,
-  calculateAttemptCost,
-  Server,
-  EventConfiguration,
-} from './starforce-calculation.utils';
+import { StarForceCalculationService } from './starforce-calculation.service';
+import { LuckAnalysisService } from './luck-analysis.service';
+import { calculateStarForce } from './starforce-calculation.utils';
 
 @Injectable()
 export class StarforceCostService {
+  constructor(
+    private readonly calculationService: StarForceCalculationService,
+    private readonly luckAnalysisService: LuckAnalysisService,
+  ) {}
+
   /**
-   * Calculate the cost to starforce an item using Brandon's proven simulation logic
+   * Enhanced calculation with all modular features
    */
-  calculateStarforceCost(
-    request: StarforceCostRequestDto,
-  ): StarforceCostResponseDto {
-    const {
-      itemLevel,
-      currentStars,
-      targetStars,
-      server = 'gms',
-      events = {},
-      safeguardEnabled = false,
-    } = request;
+  calculateEnhancedStarforceCost(
+    request: EnhancedStarforceCostRequestDto,
+  ): EnhancedStarforceCostResponseDto {
+    // Core calculation
+    const calculation = this.calculationService.calculateStarForceCost({
+      fromStar: request.fromStar,
+      toStar: request.toStar,
+      itemLevel: request.itemLevel,
+      isInteractive: request.isInteractive,
+      spareCount: request.spareCount,
+      spareCost: request.spareCost,
+      safeguardEnabled: request.safeguardEnabled,
+      events: request.events,
+    });
 
-    // Input validation
-    if (currentStars >= targetStars) {
-      throw new Error('Current stars must be less than target stars');
-    }
+    const response: EnhancedStarforceCostResponseDto = {
+      fromStar: calculation.fromStar,
+      toStar: calculation.toStar,
+      itemLevel: request.itemLevel,
+      isInteractive: calculation.isInteractive,
+      averageCost: calculation.averageCost,
+      medianCost: calculation.medianCost,
+      percentile75Cost: calculation.percentile75Cost,
+      trials: calculation.trials,
+      costDistribution: calculation.costDistribution,
+      averageSpareCount: calculation.averageSpareCount,
+      medianSpareCount: calculation.medianSpareCount,
+      percentile75SpareCount: calculation.percentile75SpareCount,
+      totalInvestment: calculation.totalInvestment,
+    };
 
-    if (currentStars < 0 || targetStars > 25 || itemLevel < 1) {
-      throw new Error(
-        'Invalid parameters. Stars must be 0-25, item level must be positive',
+    // Add luck analysis if actualCost provided
+    if (request.actualCost !== undefined) {
+      // Get cost results for luck analysis
+      const detailedCalculation = calculateStarForce(
+        request.itemLevel,
+        request.fromStar,
+        request.toStar,
+        {
+          safeguard: request.safeguardEnabled || false,
+          thirtyOff: request.events?.thirtyOff,
+          fiveTenFifteen: request.events?.fiveTenFifteen,
+          starCatching: request.events?.starCatching,
+          mvpDiscount: request.events?.mvpDiscount,
+        },
+        true, // Return cost results
       );
-    }
 
-    // Run Monte Carlo simulation (Brandon's approach)
-    const trials = 1000;
-    let totalCost = 0;
-    let totalBooms = 0;
-
-    // Apply Yohi's legendary luck early if enabled
-    const effectiveEvents: EventConfiguration = { ...events };
-    const isYohiActive = events.yohiTapEvent || false;
-
-    for (let i = 0; i < trials; i++) {
-      const { totalCost: trialCost, totalBooms: trialBooms } =
-        performEnhancementExperiment(
-          currentStars,
-          targetStars,
-          itemLevel,
-          effectiveEvents,
-          safeguardEnabled,
-          server as Server,
+      if (detailedCalculation.costResults) {
+        const luckAnalysis = this.luckAnalysisService.analyzeLuck(
+          request.actualCost,
+          detailedCalculation.costResults,
         );
 
-      totalCost += trialCost;
-      totalBooms += trialBooms;
+        response.luckAnalysis = {
+          ...luckAnalysis,
+          shareMessage:
+            this.luckAnalysisService.generateLuckSummary(luckAnalysis),
+        };
+      }
     }
 
-    // Calculate averages
-    let averageCost = totalCost / trials;
-    let averageBooms = totalBooms / trials;
-    const sparesNeeded = Math.ceil(averageBooms);
-
-    // Apply Yohi's legendary luck (halves costs and booms)
-    if (isYohiActive) {
-      averageCost *= 0.5;
-      averageBooms *= 0.5;
-    }
-
-    // Calculate per-star statistics
-    const perStarStats = this.calculatePerStarStats(
-      currentStars,
-      targetStars,
-      itemLevel,
-      server as Server,
-      effectiveEvents,
-      safeguardEnabled,
-      isYohiActive,
-    );
-
-    // Generate recommendations
-    const recommendations = generateRecommendations(
-      currentStars,
-      targetStars,
-      averageCost,
-      averageBooms,
-      effectiveEvents,
-      safeguardEnabled,
-    );
-
-    // Calculate derived metrics
-    const totalAttempts = targetStars - currentStars;
-    const costPerAttempt = averageCost / Math.max(totalAttempts, 1);
-    const successRate = 100; // Simplified for now
-    const boomRate = (averageBooms / Math.max(totalAttempts, 1)) * 100;
-
-    return {
-      currentLevel: currentStars,
-      targetLevel: targetStars,
-      averageCost: Math.round(averageCost),
-      averageBooms: Math.round(averageBooms * 100) / 100,
-      successRate: Math.round(successRate * 100) / 100,
-      boomRate: Math.round(boomRate * 100) / 100,
-      costPerAttempt: Math.round(costPerAttempt),
-      perStarStats,
-      recommendations,
-      sparesNeeded,
-    };
+    return response;
   }
 
   /**
-   * Calculate per-star statistics
+   * Bulk calculation for multiple items with shared events
    */
-  private calculatePerStarStats(
-    currentStars: number,
-    targetStars: number,
-    itemLevel: number,
-    server: Server,
-    events: EventConfiguration,
-    safeguardEnabled: boolean,
-    isYohiActive: boolean,
-  ): StarforcePerStarStatsDto[] {
-    const stats: StarforcePerStarStatsDto[] = [];
+  calculateBulkStarforceCost(
+    request: BulkEnhancedStarforceRequestDto,
+  ): BulkEnhancedStarforceResponseDto {
+    // Calculate each item using the shared events
+    const results = request.items.map((item) => {
+      const enhancedRequest: EnhancedStarforceCostRequestDto = {
+        itemLevel: item.itemLevel,
+        fromStar: item.fromStar,
+        toStar: item.toStar,
+        isInteractive: request.isInteractive,
+        safeguardEnabled: item.safeguardEnabled,
+        events: request.events, // Shared events across all items
+        spareCount: item.spareCount,
+        spareCost: item.spareCost,
+        actualCost: item.actualCost,
+      };
 
-    for (let star = currentStars; star < targetStars; star++) {
-      const rates = getStarforceRates(star);
-      let cost = calculateAttemptCost(
-        star,
-        itemLevel,
-        safeguardEnabled,
-        events,
-        server,
-      );
+      return this.calculateEnhancedStarforceCost(enhancedRequest);
+    });
 
-      // Apply Yohi's luck to individual costs
-      if (isYohiActive) {
-        cost *= 0.5;
-      }
-
-      // Apply safeguard modifications to rates for display
-      let { success, maintain, decrease, boom } = rates;
-
-      if (safeguardEnabled && star >= 12 && star <= 16) {
-        if (decrease > 0) {
-          decrease = decrease + boom;
-        } else {
-          maintain = maintain + boom;
-        }
-        boom = 0;
-      }
-
-      // Apply star catching bonus for display
-      if (events.starCatching) {
-        success = Math.min(1, success * 1.05);
-        const leftOver = 1 - success;
-
-        if (decrease === 0) {
-          maintain = (maintain * leftOver) / (maintain + boom);
-          boom = leftOver - maintain;
-        } else {
-          decrease = (decrease * leftOver) / (decrease + boom);
-          boom = leftOver - decrease;
-        }
-      }
-
-      stats.push({
-        star,
-        successRate: Math.round(success * 1000) / 10, // Convert to percentage with 1 decimal
-        boomRate: Math.round(boom * 1000) / 10,
-        cost: Math.round(cost),
-        maintainRate: Math.round(maintain * 1000) / 10,
-        decreaseRate: Math.round(decrease * 1000) / 10,
-      });
-    }
-
-    return stats;
-  }
-
-  /**
-   * Calculate starforce costs for multiple equipment items in bulk
-   */
-  calculateBulk(calculations: StarforceCostRequestDto[]): {
-    results: StarforceCostResponseDto[];
-    summary: {
-      totalExpectedCost: number;
-      totalExpectedAttempts: number;
-      totalCalculations: number;
-    };
-  } {
-    const results: StarforceCostResponseDto[] = [];
-    let totalExpectedCost = 0;
-    let totalExpectedAttempts = 0;
-
-    // Process each calculation
-    for (const calculation of calculations) {
-      const result = this.calculateStarforceCost(calculation);
-      results.push(result);
-      totalExpectedCost += result.averageCost;
-      // Calculate attempts from average cost and cost per attempt
-      totalExpectedAttempts += result.averageCost / result.costPerAttempt;
-    }
+    // Calculate summary statistics
+    const totalExpectedCost = results.reduce(
+      (sum, result) => sum + result.averageCost,
+      0,
+    );
+    const totalMedianCost = results.reduce(
+      (sum, result) => sum + result.medianCost,
+      0,
+    );
+    const totalConservativeCost = results.reduce(
+      (sum, result) => sum + result.percentile75Cost,
+      0,
+    );
+    const totalExpectedBooms = results.reduce(
+      (sum, result) => sum + (result.averageSpareCount || 0),
+      0,
+    );
+    const worstCaseScenario = results.reduce(
+      (sum, result) => sum + result.costDistribution.max,
+      0,
+    );
+    const bestCaseScenario = results.reduce(
+      (sum, result) => sum + result.costDistribution.min,
+      0,
+    );
 
     return {
       results,
       summary: {
-        totalExpectedCost: Math.round(totalExpectedCost),
-        totalExpectedAttempts: Math.round(totalExpectedAttempts),
-        totalCalculations: calculations.length,
+        totalExpectedCost,
+        totalMedianCost,
+        totalConservativeCost,
+        totalExpectedBooms,
+        totalCalculations: results.length,
+        worstCaseScenario,
+        bestCaseScenario,
       },
     };
   }
+
 }

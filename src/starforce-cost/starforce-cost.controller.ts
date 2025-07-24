@@ -2,10 +2,10 @@ import { Controller, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { StarforceCostService } from './services/starforce-cost.service';
 import {
-  StarforceCostRequestDto,
-  StarforceCostResponseDto,
-  BulkStarforceRequestDto,
-  BulkStarforceResponseDto,
+  BulkEnhancedStarforceRequestDto,
+  BulkEnhancedStarforceResponseDto,
+  EnhancedStarforceCostRequestDto,
+  EnhancedStarforceCostResponseDto,
 } from './contracts';
 
 @ApiTags('Starforce')
@@ -13,152 +13,148 @@ import {
 export class StarforceCostController {
   constructor(private readonly starforceCostService: StarforceCostService) {}
 
-  @Post('calculate')
+  @Post('calculate-bulk')
   @ApiOperation({
-    summary: 'Calculate Starforce Enhancement Cost',
+    summary: 'Calculate Starforce Costs for Multiple Items (Main Endpoint)',
     description:
-      "Calculate the expected cost and statistics for starforcing an item from current stars to target stars. Uses Monte Carlo simulation with Brandon\\'s proven calculator logic.",
+      'The primary endpoint for calculating starforce costs. Handles multiple equipment items with shared server events (30% off, star catching, etc.) and individual item settings (safeguard per item). Perfect for calculating entire equipment sets with realistic event scenarios.',
   })
   @ApiBody({
-    type: StarforceCostRequestDto,
-    description: 'Enhancement parameters and event configurations',
+    type: BulkEnhancedStarforceRequestDto,
+    description:
+      'Bulk calculation with shared server events and individual item settings',
     examples: {
-      basicCalculation: {
-        summary: 'Basic 0★ to 17★ calculation',
+      fullEquipmentSet: {
+        summary: '🎯 Complete Equipment Set (Recommended)',
+        description:
+          'Calculate costs for a full equipment set with 30% off event and star catching active for all items, with individual safeguard choices',
         value: {
-          itemLevel: 150,
-          currentStars: 0,
-          targetStars: 17,
-          server: 'gms',
-          safeguardEnabled: false,
-          events: {
-            starCatching: true,
-          },
-        },
-      },
-      highStarWithEvents: {
-        summary: '15★ to 22★ with events and safeguard',
-        value: {
-          itemLevel: 200,
-          currentStars: 15,
-          targetStars: 22,
-          server: 'gms',
-          safeguardEnabled: true,
+          isInteractive: true,
           events: {
             thirtyOff: true,
             starCatching: true,
             mvpDiscount: 0.15,
           },
-        },
-      },
-      yohiLuck: {
-        summary: "With Yohi\\'s legendary luck event",
-        value: {
-          itemLevel: 160,
-          currentStars: 12,
-          targetStars: 17,
-          server: 'gms',
-          safeguardEnabled: true,
-          events: {
-            yohiTapEvent: true,
-            starCatching: true,
-          },
-        },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Enhancement cost calculation completed successfully',
-    type: StarforceCostResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid input parameters',
-    schema: {
-      type: 'object',
-      properties: {
-        statusCode: { type: 'number', example: 400 },
-        message: {
-          type: 'string',
-          example: 'Current stars must be less than target stars',
-        },
-        error: { type: 'string', example: 'Bad Request' },
-      },
-    },
-  })
-  calculateCost(
-    @Body() request: StarforceCostRequestDto,
-  ): StarforceCostResponseDto {
-    return this.starforceCostService.calculateStarforceCost(request);
-  }
-
-  @Post('simulate')
-  @ApiOperation({
-    summary: 'Advanced Starforce Simulation',
-    description:
-      'Perform advanced starforce simulation with extended trial options. This endpoint provides the same calculation as /calculate but allows for future extension with custom trial counts.',
-  })
-  @ApiBody({
-    type: StarforceCostRequestDto,
-    description: 'Enhancement parameters for simulation',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Simulation completed successfully',
-    type: StarforceCostResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid simulation parameters',
-  })
-  simulateEnhancement(
-    @Body()
-    request: StarforceCostRequestDto & {
-      trials?: number;
-    },
-  ): StarforceCostResponseDto {
-    // For simulation endpoint, we can add additional trial count if needed
-    return this.starforceCostService.calculateStarforceCost(request);
-  }
-
-  @Post('calculate-bulk')
-  @ApiOperation({
-    summary: 'Calculate Starforce Costs for Multiple Items',
-    description:
-      'Calculate the expected costs and statistics for multiple equipment items at once. Perfect for calculating entire equipment sets or comparing different enhancement paths.',
-  })
-  @ApiBody({
-    type: BulkStarforceRequestDto,
-    description: 'Array of enhancement calculations',
-    examples: {
-      equipmentSet: {
-        summary: 'Calculate costs for a full equipment set',
-        value: {
-          calculations: [
+          items: [
             {
               itemLevel: 200,
-              currentStars: 12,
-              targetStars: 17,
-              server: 'gms',
-              safeguardEnabled: false,
-              events: { starCatching: true },
+              fromStar: 15,
+              toStar: 22,
+              safeguardEnabled: true,
+              spareCount: 3,
+              spareCost: 800000000,
+              itemName: 'Arcane Umbra Weapon',
             },
             {
               itemLevel: 200,
-              currentStars: 15,
-              targetStars: 22,
-              server: 'gms',
-              safeguardEnabled: true,
-              events: { feverTime: true, shiningStarforce: true },
+              fromStar: 12,
+              toStar: 17,
+              safeguardEnabled: false,
+              spareCount: 2,
+              spareCost: 600000000,
+              itemName: 'Arcane Umbra Top',
+            },
+            {
+              itemLevel: 200,
+              fromStar: 12,
+              toStar: 17,
+              safeguardEnabled: false,
+              spareCount: 2,
+              spareCost: 600000000,
+              itemName: 'Arcane Umbra Bottom',
             },
             {
               itemLevel: 160,
-              currentStars: 10,
-              targetStars: 17,
-              server: 'gms',
+              fromStar: 10,
+              toStar: 17,
               safeguardEnabled: false,
-              events: {},
+              spareCount: 1,
+              spareCost: 400000000,
+              itemName: 'Superior Gollux Ring',
+            },
+          ],
+        },
+      },
+      fiveTenFifteenEvent: {
+        summary: '🌟 5/10/15 Event Active',
+        description:
+          'Equipment set calculation during 5/10/15 guaranteed success event',
+        value: {
+          isInteractive: true,
+          events: {
+            fiveTenFifteen: true,
+            starCatching: true,
+          },
+          items: [
+            {
+              itemLevel: 160,
+              fromStar: 0,
+              toStar: 15,
+              safeguardEnabled: false,
+              itemName: 'New Equipment to 15★',
+            },
+            {
+              itemLevel: 200,
+              fromStar: 15,
+              toStar: 17,
+              safeguardEnabled: true,
+              itemName: 'Push to 17★',
+            },
+          ],
+        },
+      },
+      luckAnalysisSet: {
+        summary: '📊 Luck Analysis for Multiple Items',
+        description: 'Analyze your luck on multiple items you already enhanced',
+        value: {
+          isInteractive: true,
+          events: {
+            starCatching: true,
+          },
+          items: [
+            {
+              itemLevel: 160,
+              fromStar: 12,
+              toStar: 17,
+              safeguardEnabled: true,
+              actualCost: 1200000000,
+              itemName: 'Main Weapon (Lucky)',
+            },
+            {
+              itemLevel: 160,
+              fromStar: 12,
+              toStar: 17,
+              safeguardEnabled: false,
+              actualCost: 2800000000,
+              itemName: 'Secondary Weapon (Unlucky)',
+            },
+            {
+              itemLevel: 200,
+              fromStar: 15,
+              toStar: 22,
+              safeguardEnabled: true,
+              actualCost: 25000000000,
+              itemName: 'Armor (Average)',
+            },
+          ],
+        },
+      },
+      noEventsConservative: {
+        summary: '🛡️ Conservative No-Event Calculation',
+        description:
+          'Calculate costs without any events for worst-case planning',
+        value: {
+          isInteractive: true,
+          events: {},
+          items: [
+            {
+              itemLevel: 200,
+              fromStar: 17,
+              toStar: 22,
+              safeguardEnabled: true,
+              spareCount: 5,
+              spareCost: 1000000000,
+              itemName: 'High-Risk Enhancement',
             },
           ],
         },
@@ -168,15 +164,69 @@ export class StarforceCostController {
   @ApiResponse({
     status: 200,
     description: 'Bulk calculations completed successfully',
-    type: BulkStarforceResponseDto,
+    type: BulkEnhancedStarforceResponseDto,
   })
   @ApiResponse({
     status: 400,
     description: 'Invalid calculation parameters',
   })
   calculateBulk(
-    @Body() request: BulkStarforceRequestDto,
-  ): BulkStarforceResponseDto {
-    return this.starforceCostService.calculateBulk(request.calculations);
+    @Body() request: BulkEnhancedStarforceRequestDto,
+  ): BulkEnhancedStarforceResponseDto {
+    return this.starforceCostService.calculateBulkStarforceCost(request);
+  }
+
+  @Post('calculate')
+  @ApiOperation({
+    summary: 'Calculate Single Item Starforce Cost',
+    description:
+      'Calculate the expected cost and statistics for a single item. For multiple items, use /calculate-bulk instead.',
+  })
+  @ApiBody({
+    type: EnhancedStarforceCostRequestDto,
+    description: 'Single item calculation parameters',
+    examples: {
+      basicCalculation: {
+        summary: 'Basic 12★ to 17★ calculation',
+        value: {
+          itemLevel: 160,
+          fromStar: 12,
+          toStar: 17,
+          isInteractive: true,
+          safeguardEnabled: false,
+          events: {
+            starCatching: true,
+          },
+        },
+      },
+      withLuckAnalysis: {
+        summary: 'With luck analysis',
+        value: {
+          itemLevel: 160,
+          fromStar: 12,
+          toStar: 17,
+          isInteractive: true,
+          actualCost: 1200000000,
+          safeguardEnabled: true,
+          events: {
+            starCatching: true,
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Enhancement cost calculation completed successfully',
+    type: EnhancedStarforceCostResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input parameters',
+  })
+  calculateCost(
+    @Body() request: EnhancedStarforceCostRequestDto,
+  ): EnhancedStarforceCostResponseDto {
+    return this.starforceCostService.calculateEnhancedStarforceCost(request);
   }
 }
