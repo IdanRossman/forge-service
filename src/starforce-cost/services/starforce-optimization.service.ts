@@ -100,7 +100,48 @@ export class StarforceOptimizationService {
     const steps: EnhancementStep[] = [];
     
     items.forEach((item, itemIndex) => {
-      for (let star = item.fromStar; star < item.toStar; star++) {
+      const startingStar = item.fromStar;
+      const targetStar = item.toStar;
+      
+      // If item is below 15★, create a single "tap to 15★" step
+      if (startingStar < 15) {
+        const tapTo15Star = Math.min(15, targetStar);
+        
+        // Calculate cost for tapping to 15★ (or target if lower)
+        const tapCalculation = this.calculationService.calculateStarForceCost({
+          fromStar: startingStar,
+          toStar: tapTo15Star,
+          itemLevel: item.itemLevel,
+          isInteractive: isInteractive || false,
+          spareCount: 0,
+          spareCost: 0,
+          safeguardEnabled: item.safeguardEnabled,
+          events,
+        });
+
+        steps.push({
+          itemIndex,
+          itemName: item.itemName || `Level ${item.itemLevel} Item #${itemIndex + 1}`,
+          fromStar: startingStar,
+          toStar: tapTo15Star,
+          expectedCost: tapCalculation.averageCost,
+          expectedBooms: 0, // No boom risk below 15★
+          efficiency: (tapTo15Star - startingStar) / tapCalculation.averageCost, // Stars per meso
+          riskLevel: 'Low',
+          priority: this.calculateStepPriority(startingStar, tapCalculation.averageCost, 'Low'),
+          canAfford: true,
+          spareRequirement: 0,
+          availableSpares: item.spareCount || 0,
+          isGuaranteed: false,
+        });
+      }
+      
+      // Generate individual steps for 15★ and above
+      const enhanceStart = Math.max(startingStar, 15);
+      for (let star = enhanceStart; star < targetStar; star++) {
+        // Skip if we already handled this range with tap to 15
+        if (star < 15) continue;
+        
         // Calculate cost for this single star enhancement
         const stepCalculation = this.calculationService.calculateStarForceCost({
           fromStar: star,
@@ -204,7 +245,9 @@ export class StarforceOptimizationService {
         // Add this step to the plan
         actionPlan.push({
           step: stepNumber++,
-          action: `Enhance ${nextStep.itemName}`,
+          action: nextStep.fromStar < 15 ? 
+            `Tap ${nextStep.itemName} to ${nextStep.toStar}★` : 
+            `Enhance ${nextStep.itemName}`,
           fromStar: nextStep.fromStar,
           toStar: nextStep.toStar,
           expectedCost: nextStep.expectedCost,
@@ -217,7 +260,7 @@ export class StarforceOptimizationService {
         });
         
         remainingBudget -= nextStep.expectedCost;
-        currentStars[itemIndex]++;
+        currentStars[itemIndex] = nextStep.toStar; // Update to the new star level
         hasProgressedThisRound = true;
         
         // Break if budget is too low to continue
@@ -269,7 +312,12 @@ export class StarforceOptimizationService {
       const itemSteps = actionPlan.filter(step => 
         step.action.includes(itemName) || step.action.includes(`Item #${index + 1}`)
       );
-      const achievableTarget = item.fromStar + itemSteps.length;
+      
+      // Calculate final star level by considering multi-star steps
+      let achievableTarget = item.fromStar;
+      itemSteps.forEach(step => {
+        achievableTarget = step.toStar; // Each step brings us to its toStar level
+      });
       
       return {
         itemIndex: index,
@@ -412,11 +460,18 @@ export class StarforceOptimizationService {
         step.action.includes(itemName) || step.action.includes(`Item #${index + 1}`)
       );
       
+      // Calculate final star level and total stars gained considering multi-star steps
+      let finalStar = item.fromStar;
+      itemSteps.forEach(step => {
+        finalStar = step.toStar;
+      });
+      const starsGained = finalStar - item.fromStar;
+      
       return {
         itemName,
         originalTarget: item.toStar,
-        starsGained: itemSteps.length,
-        finalStar: item.fromStar + itemSteps.length,
+        starsGained,
+        finalStar,
         stepsCompleted: itemSteps.length,
         totalCost: itemSteps.reduce((sum, step) => sum + step.expectedCost, 0),
       };
