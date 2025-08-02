@@ -16,6 +16,7 @@ export interface StarforceOptimizationRequestDto {
     starCatching?: boolean;
     mvpDiscount?: boolean;
   };
+  riskTolerance?: 'conservative' | 'balanced' | 'aggressive';
 }
 
 export interface StarforceOptimizationResponseDto {

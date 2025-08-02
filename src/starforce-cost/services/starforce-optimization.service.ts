@@ -49,7 +49,13 @@ export class StarforceOptimizationService {
   calculateOptimalStarforceStrategy(
     request: StarforceOptimizationRequestDto,
   ): StarforceOptimizationResponseDto {
-    const { items, availableMeso, isInteractive, events } = request;
+    const {
+      items,
+      availableMeso,
+      isInteractive,
+      events,
+      riskTolerance = 'balanced',
+    } = request;
 
     // Generate all possible enhancement steps with efficiency scores
     const enhancementSteps = this.generateAllPossibleSteps(items, isInteractive, events);
@@ -58,7 +64,7 @@ export class StarforceOptimizationService {
     const sortedSteps = enhancementSteps.sort((a, b) => b.efficiency - a.efficiency);
 
     // Build optimal action plan within budget
-    const actionPlan = this.buildOptimalActionPlan(sortedSteps, availableMeso, items, events);
+    const actionPlan = this.buildOptimalActionPlan(sortedSteps, availableMeso, items, events, riskTolerance);
 
     // Calculate what's achievable vs what was requested
     const achievableTargets = this.calculateAchievableTargets(actionPlan, items);
@@ -132,61 +138,129 @@ export class StarforceOptimizationService {
     return steps;
   }
 
-  private buildOptimalActionPlan(sortedSteps: EnhancementStep[], budget: number, items: any[], events?: any): ActionStep[] {
+  private buildOptimalActionPlan(
+    sortedSteps: EnhancementStep[], 
+    budget: number, 
+    items: any[], 
+    events?: any, 
+    riskTolerance: 'conservative' | 'balanced' | 'aggressive' = 'balanced'
+  ): ActionStep[] {
     const actionPlan: ActionStep[] = [];
     let remainingBudget = budget;
     let stepNumber = 1;
     
     // Track current star level for each item
     const currentStars = items.map(item => item.fromStar);
-
-    for (const step of sortedSteps) {
-      // Check if we can afford this step
-      if (step.expectedCost > remainingBudget) {
-        continue;
-      }
-
-      // Check if this step is the next logical step for this item
-      if (step.fromStar !== currentStars[step.itemIndex]) {
-        continue;
-      }
-
-      // Check spare requirements
-      if (step.spareRequirement > step.availableSpares && step.fromStar >= 15 && !step.isGuaranteed) {
-        continue; // Skip if insufficient spares for boom-possible enhancement
-      }
-
-      // Add special note for guaranteed successes
-      let specialNote: string | undefined = undefined;
-      if (step.isGuaranteed) {
-        specialNote = "★ GUARANTEED SUCCESS (5/10/15 Event) ★";
-      }
-
-      // Add this step to the plan
-      actionPlan.push({
-        step: stepNumber++,
-        action: `Enhance ${step.itemName}`,
-        fromStar: step.fromStar,
-        toStar: step.toStar,
-        expectedCost: step.expectedCost,
-        expectedBooms: step.isGuaranteed ? 0 : step.expectedBooms,
-        riskLevel: step.isGuaranteed ? 'Low' : step.riskLevel,
-        efficiency: step.efficiency,
-        cumulativeCost: (actionPlan.reduce((sum, s) => sum + s.expectedCost, 0)) + step.expectedCost,
-        remainingBudget: remainingBudget - step.expectedCost,
-        specialNote,
-      });
-
-      remainingBudget -= step.expectedCost;
-      currentStars[step.itemIndex]++;
-
-      // Early exit if budget is very low
-      if (remainingBudget < 50000000) { // Less than 50m meso
-        break;
+    
+    // Keep trying to find viable enhancements until budget is exhausted
+    let hasProgressedThisRound = true;
+    
+    while (hasProgressedThisRound && remainingBudget > 50000000) {
+      hasProgressedThisRound = false;
+      
+      // For each item, try to find the next enhancement step
+      for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
+        const currentStar = currentStars[itemIndex];
+        const targetStar = items[itemIndex].toStar;
+        
+        // Skip if item already at target
+        if (currentStar >= targetStar) {
+          continue;
+        }
+        
+        // Find the next step for this item
+        const nextStep = sortedSteps.find(step => 
+          step.itemIndex === itemIndex && 
+          step.fromStar === currentStar
+        );
+        
+        if (!nextStep) {
+          continue; // No more steps available for this item
+        }
+        
+        // Check if we can afford this step
+        if (nextStep.expectedCost > remainingBudget) {
+          continue;
+        }
+        
+        // Check risk tolerance and spare requirements
+        if (!this.isStepAllowedByRiskTolerance(nextStep, riskTolerance)) {
+          continue;
+        }
+        
+        // Check spare requirements for boom-possible enhancements
+        if (nextStep.spareRequirement > nextStep.availableSpares && 
+            nextStep.fromStar >= 15 && 
+            !nextStep.isGuaranteed) {
+          continue;
+        }
+        
+        // Add special note for guaranteed successes
+        let specialNote: string | undefined = undefined;
+        if (nextStep.isGuaranteed) {
+          specialNote = "★ GUARANTEED SUCCESS (5/10/15 Event) ★";
+        }
+        
+        // Add this step to the plan
+        actionPlan.push({
+          step: stepNumber++,
+          action: `Enhance ${nextStep.itemName}`,
+          fromStar: nextStep.fromStar,
+          toStar: nextStep.toStar,
+          expectedCost: nextStep.expectedCost,
+          expectedBooms: nextStep.isGuaranteed ? 0 : nextStep.expectedBooms,
+          riskLevel: nextStep.isGuaranteed ? 'Low' : nextStep.riskLevel,
+          efficiency: nextStep.efficiency,
+          cumulativeCost: (actionPlan.reduce((sum, s) => sum + s.expectedCost, 0)) + nextStep.expectedCost,
+          remainingBudget: remainingBudget - nextStep.expectedCost,
+          specialNote,
+        });
+        
+        remainingBudget -= nextStep.expectedCost;
+        currentStars[itemIndex]++;
+        hasProgressedThisRound = true;
+        
+        // Break if budget is too low to continue
+        if (remainingBudget < 50000000) {
+          break;
+        }
       }
     }
 
     return actionPlan;
+  }
+
+  /**
+   * Check if a step is allowed based on risk tolerance
+   */
+  private isStepAllowedByRiskTolerance(
+    step: EnhancementStep, 
+    riskTolerance: 'conservative' | 'balanced' | 'aggressive'
+  ): boolean {
+    // Always allow guaranteed steps
+    if (step.isGuaranteed) {
+      return true;
+    }
+    
+    // Check based on risk tolerance
+    switch (riskTolerance) {
+      case 'conservative':
+        // Only allow low risk steps, or medium risk if star level is below 17
+        return step.riskLevel === 'Low' || (step.riskLevel === 'Medium' && step.fromStar < 17);
+        
+      case 'balanced':
+        // Allow low and medium risk, high risk only for very cost-efficient steps
+        return step.riskLevel === 'Low' || 
+               step.riskLevel === 'Medium' || 
+               (step.riskLevel === 'High' && step.efficiency > 0.000001); // Very efficient high-risk steps
+        
+      case 'aggressive':
+        // Allow all risk levels
+        return true;
+        
+      default:
+        return step.riskLevel === 'Low' || step.riskLevel === 'Medium';
+    }
   }
 
   private calculateAchievableTargets(actionPlan: ActionStep[], items: any[]) {
