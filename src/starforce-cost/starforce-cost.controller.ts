@@ -1,17 +1,23 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { StarforceCostService } from './services/starforce-cost.service';
+import { StarforceOptimizationService } from './services/starforce-optimization.service';
 import {
   BulkEnhancedStarforceRequestDto,
   BulkEnhancedStarforceResponseDto,
   EnhancedStarforceCostRequestDto,
   EnhancedStarforceCostResponseDto,
+  StarforceOptimizationRequestDto,
+  StarforceOptimizationResponseDto,
 } from './contracts';
 
 @ApiTags('Starforce')
 @Controller('Starforce')
 export class StarforceCostController {
-  constructor(private readonly starforceCostService: StarforceCostService) {}
+  constructor(
+    private readonly starforceCostService: StarforceCostService,
+    private readonly starforceOptimizationService: StarforceOptimizationService,
+  ) {}
 
   @Post('calculate-bulk')
   @ApiOperation({
@@ -228,5 +234,93 @@ export class StarforceCostController {
     @Body() request: EnhancedStarforceCostRequestDto,
   ): EnhancedStarforceCostResponseDto {
     return this.starforceCostService.calculateEnhancedStarforceCost(request);
+  }
+
+  @Post('optimize')
+  @ApiOperation({
+    summary: 'Optimize Starforce Strategy Within Budget',
+    description:
+      'Calculate the optimal starforcing sequence to maximize stars gained within a specific meso budget. Uses cost efficiency analysis to prioritize the most cost-effective enhancements first.',
+  })
+  @ApiBody({
+    description: 'Budget-constrained optimization parameters',
+    examples: {
+      budgetOptimization: {
+        summary: '💰 Budget Optimization Example',
+        description: 'Maximize stars gained with 5B meso budget',
+        value: {
+          availableMeso: 5000000000,
+          isInteractive: false,
+          events: {
+            fiveTenFifteen: true,
+            thirtyOff: true,
+          },
+          items: [
+            {
+              itemLevel: 200,
+              fromStar: 15,
+              toStar: 19,
+              spareCount: 2,
+              spareCost: 500000000,
+              itemName: 'Absolab Weapon',
+              safeguardEnabled: true,
+            },
+            {
+              itemLevel: 200,
+              fromStar: 14,
+              toStar: 18,
+              spareCount: 3,
+              spareCost: 500000000,
+              itemName: 'Absolab Armor',
+              safeguardEnabled: true,
+            },
+          ],
+        },
+      },
+      conservativeBudget: {
+        summary: '🛡️ Conservative Budget Planning',
+        description: 'Limited budget with risk-aware recommendations',
+        value: {
+          availableMeso: 2000000000,
+          isInteractive: true,
+          events: {
+            starCatching: true,
+          },
+          items: [
+            {
+              itemLevel: 160,
+              fromStar: 12,
+              toStar: 17,
+              spareCount: 1,
+              spareCost: 300000000,
+              itemName: 'Superior Ring',
+              safeguardEnabled: false,
+            },
+            {
+              itemLevel: 160,
+              fromStar: 10,
+              toStar: 15,
+              spareCount: 0,
+              spareCost: 300000000,
+              itemName: 'Secondary Weapon',
+              safeguardEnabled: false,
+            },
+          ],
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Optimization strategy calculated successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid optimization parameters',
+  })
+  optimizeStarforce(
+    @Body() request: StarforceOptimizationRequestDto,
+  ): StarforceOptimizationResponseDto {
+    return this.starforceOptimizationService.calculateOptimalStarforceStrategy(request);
   }
 }
