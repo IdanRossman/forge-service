@@ -193,72 +193,92 @@ export class StarforceOptimizationService {
     // Track current star level for each item
     const currentStars = items.map(item => item.fromStar);
     
-    // Process steps in efficiency order (highest efficiency first)
-    for (const step of sortedSteps) {
-      // Check if budget is exhausted
-      if (remainingBudget < 50000000) {
+    // Generate ALL possible steps regardless of budget or risk - let users decide their own limits!
+    // This accounts for lucky scenarios where users spend much less than expected
+    const allPossibleSteps: ActionStep[] = [];
+    let cumulativeCost = 0;
+    let allStepsStepNumber = 1;
+    
+    // Keep processing until all items reach their targets
+    while (true) {
+      let bestStep: EnhancementStep | null = null;
+      let bestEfficiency = 0;
+      
+      // Find the best available step for current state
+      for (const step of sortedSteps) {
+        const itemIndex = step.itemIndex;
+        const currentStar = currentStars[itemIndex];
+        const targetStar = items[itemIndex].toStar;
+        
+        // Skip if item already at target
+        if (currentStar >= targetStar) {
+          continue;
+        }
+        
+        // Check if this step is the next logical step for this item
+        if (step.fromStar !== currentStar) {
+          continue;
+        }
+        
+        // This is a valid step - check if it's the best efficiency so far
+        if (step.efficiency > bestEfficiency) {
+          bestStep = step;
+          bestEfficiency = step.efficiency;
+        }
+      }
+      
+      // If no valid step found, we've completed all possible enhancements
+      if (!bestStep) {
         break;
       }
       
-      const itemIndex = step.itemIndex;
-      const currentStar = currentStars[itemIndex];
-      const targetStar = items[itemIndex].toStar;
-      
-      // Skip if item already at target
-      if (currentStar >= targetStar) {
-        continue;
-      }
-      
-      // Check if this step is the next logical step for this item
-      if (step.fromStar !== currentStar) {
-        continue;
-      }
-      
-      // Check if we can afford this step
-      if (step.expectedCost > remainingBudget) {
-        continue;
-      }
-      
-      // Check risk tolerance and spare requirements
-      if (!this.isStepAllowedByRiskTolerance(step, riskTolerance)) {
-        continue;
-      }
-      
-      // Check spare requirements for boom-possible enhancements
-      if (step.spareRequirement > step.availableSpares && 
-          step.fromStar >= 15 && 
-          !step.isGuaranteed) {
-        continue;
-      }
-      
-      // Add special note for guaranteed successes
+      // Add special note for guaranteed successes or budget warnings
       let specialNote: string | undefined = undefined;
-      if (step.isGuaranteed) {
+      if (bestStep.isGuaranteed) {
         specialNote = "★ GUARANTEED SUCCESS (5/10/15 Event) ★";
+      } else if (cumulativeCost + bestStep.expectedCost > budget) {
+        specialNote = `⚠️ EXCEEDS BUDGET - Expected cost: ${((cumulativeCost + bestStep.expectedCost) / 1000000).toFixed(0)}M (${(((cumulativeCost + bestStep.expectedCost - budget) / 1000000)).toFixed(0)}M over)`;
       }
       
-      // Add this step to the plan
-      actionPlan.push({
-        step: stepNumber++,
-        action: step.fromStar < 15 ? 
-          `Tap ${step.itemName} to ${step.toStar}★` : 
-          `Enhance ${step.itemName}`,
-        fromStar: step.fromStar,
-        toStar: step.toStar,
-        expectedCost: step.expectedCost,
-        expectedBooms: step.isGuaranteed ? 0 : step.expectedBooms,
-        riskLevel: step.isGuaranteed ? 'Low' : step.riskLevel,
-        efficiency: step.efficiency,
-        cumulativeCost: (actionPlan.reduce((sum, s) => sum + s.expectedCost, 0)) + step.expectedCost,
-        remainingBudget: remainingBudget - step.expectedCost,
+      // Add this step to the complete plan
+      const stepAction: ActionStep = {
+        step: allStepsStepNumber++,
+        action: bestStep.fromStar < 15 ? 
+          `Tap ${bestStep.itemName} to ${bestStep.toStar}★` : 
+          `Enhance ${bestStep.itemName}`,
+        fromStar: bestStep.fromStar,
+        toStar: bestStep.toStar,
+        expectedCost: bestStep.expectedCost,
+        expectedBooms: bestStep.isGuaranteed ? 0 : bestStep.expectedBooms,
+        riskLevel: bestStep.isGuaranteed ? 'Low' : bestStep.riskLevel,
+        efficiency: bestStep.efficiency,
+        cumulativeCost: cumulativeCost + bestStep.expectedCost,
+        remainingBudget: budget - (cumulativeCost + bestStep.expectedCost),
         specialNote,
-      });
+      };
       
-      remainingBudget -= step.expectedCost;
-      currentStars[itemIndex] = step.toStar; // Update to the new star level
+      allPossibleSteps.push(stepAction);
+      
+      // Also add to budget-constrained plan if within budget and risk tolerance
+      if (cumulativeCost + bestStep.expectedCost <= budget && 
+          this.isStepAllowedByRiskTolerance(bestStep, riskTolerance) &&
+          remainingBudget >= bestStep.expectedCost) {
+        
+        actionPlan.push({
+          ...stepAction,
+          step: stepNumber++,
+          remainingBudget: remainingBudget - bestStep.expectedCost,
+        });
+        
+        remainingBudget -= bestStep.expectedCost;
+      }
+      
+      cumulativeCost += bestStep.expectedCost;
+      currentStars[bestStep.itemIndex] = bestStep.toStar; // Update to the new star level
     }
 
-    return actionPlan;
+    // Return all possible steps - this gives users the complete roadmap
+    return allPossibleSteps;
   }
 
   /**
@@ -276,14 +296,16 @@ export class StarforceOptimizationService {
     // Check based on risk tolerance
     switch (riskTolerance) {
       case 'conservative':
-        // Only allow low risk steps, or medium risk if star level is below 17
-        return step.riskLevel === 'Low' || (step.riskLevel === 'Medium' && step.fromStar < 17);
+        // Allow low risk always, medium risk below 20★, high risk below 17★
+        return step.riskLevel === 'Low' || 
+               (step.riskLevel === 'Medium' && step.fromStar < 20) ||
+               (step.riskLevel === 'High' && step.fromStar < 17);
         
       case 'balanced':
-        // Allow low and medium risk, high risk only for very cost-efficient steps
+        // Allow low and medium risk always, high risk below 22★
         return step.riskLevel === 'Low' || 
                step.riskLevel === 'Medium' || 
-               (step.riskLevel === 'High' && step.efficiency > 0.000001); // Very efficient high-risk steps
+               (step.riskLevel === 'High' && step.fromStar < 22);
         
       case 'aggressive':
         // Allow all risk levels
@@ -435,9 +457,7 @@ export class StarforceOptimizationService {
   }
 
   private canAffordStep(item: any, starLevel: number) {
-    if (starLevel >= 15) {
-      return (item.spareCount || 0) > 0; // Need spares for boom-possible
-    }
+    // No spare count restrictions - budget-only optimization
     return true;
   }
 
@@ -478,7 +498,6 @@ export class StarforceOptimizationService {
   }
 
   private assessStepRisk(item: any, starLevel: number) {
-    const spareCount = item.spareCount || 0;
     const boomPossible = starLevel >= 15;
     const highRisk = starLevel >= 17;
 
@@ -486,27 +505,19 @@ export class StarforceOptimizationService {
       return { level: 'Low', warning: null, recommendation: null };
     }
 
-    if (spareCount === 0) {
-      return {
-        level: 'Critical',
-        warning: `No spares available for boom-possible enhancement to ${starLevel + 1}★`,
-        recommendation: 'Consider stopping here or acquiring spares first'
-      };
-    }
-
-    if (highRisk && spareCount < 2) {
+    if (highRisk) {
       return {
         level: 'High',
-        warning: `Only ${spareCount} spare(s) for high-risk ${starLevel}★→${starLevel + 1}★`,
-        recommendation: 'Consider using safeguard and having backup spares ready'
+        warning: `High-risk ${starLevel}★→${starLevel + 1}★ enhancement`,
+        recommendation: 'Consider using safeguard for protection'
       };
     }
 
-    if (boomPossible && spareCount < 3) {
+    if (boomPossible) {
       return {
         level: 'Medium',
-        warning: `Limited spares (${spareCount}) for ${starLevel}★→${starLevel + 1}★`,
-        recommendation: 'Proceed with caution'
+        warning: `Boom-possible ${starLevel}★→${starLevel + 1}★ enhancement`,
+        recommendation: 'Have backup plan ready'
       };
     }
 
