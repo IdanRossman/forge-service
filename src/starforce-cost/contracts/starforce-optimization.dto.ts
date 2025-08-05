@@ -7,6 +7,8 @@ export interface StarforceOptimizationRequestDto {
     spareCount?: number;
     spareCost?: number;
     itemName?: string;
+    itemType?: string; // e.g., 'weapon', 'secondary', 'gloves', 'helm', 'top', 'bottom', etc.
+    base_attack?: number; // Required for weapons to calculate 2% visible ATT gains
   }>;
   availableMeso: number;
   isInteractive?: boolean;

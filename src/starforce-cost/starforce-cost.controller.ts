@@ -50,6 +50,8 @@ export class StarforceCostController {
               spareCount: 3,
               spareCost: 800000000,
               itemName: 'Arcane Umbra Weapon',
+              itemType: 'weapon',
+              base_attack: 300,
             },
             {
               itemLevel: 200,
@@ -59,6 +61,7 @@ export class StarforceCostController {
               spareCount: 2,
               spareCost: 600000000,
               itemName: 'Arcane Umbra Top',
+              itemType: 'top',
             },
             {
               itemLevel: 200,
@@ -68,6 +71,7 @@ export class StarforceCostController {
               spareCount: 2,
               spareCost: 600000000,
               itemName: 'Arcane Umbra Bottom',
+              itemType: 'bottom',
             },
             {
               itemLevel: 160,
@@ -77,6 +81,7 @@ export class StarforceCostController {
               spareCount: 1,
               spareCost: 400000000,
               itemName: 'Superior Gollux Ring',
+              itemType: 'ring',
             },
           ],
         },
@@ -264,6 +269,8 @@ export class StarforceCostController {
               spareCost: 500000000,
               itemName: 'Absolab Weapon',
               safeguardEnabled: true,
+              itemType: 'weapon',
+              base_attack: 242,
             },
             {
               itemLevel: 200,
@@ -273,6 +280,7 @@ export class StarforceCostController {
               spareCost: 500000000,
               itemName: 'Absolab Armor',
               safeguardEnabled: true,
+              itemType: 'top',
             },
           ],
         },
@@ -295,6 +303,7 @@ export class StarforceCostController {
               spareCost: 300000000,
               itemName: 'Superior Ring',
               safeguardEnabled: false,
+              itemType: 'ring',
             },
             {
               itemLevel: 160,
@@ -304,6 +313,8 @@ export class StarforceCostController {
               spareCost: 300000000,
               itemName: 'Secondary Weapon',
               safeguardEnabled: false,
+              itemType: 'secondary',
+              base_attack: 165,
             },
           ],
         },
@@ -321,6 +332,8 @@ export class StarforceCostController {
   optimizeStarforce(
     @Body() request: StarforceOptimizationRequestDto,
   ): StarforceOptimizationResponseDto {
-    return this.starforceOptimizationService.calculateOptimalStarforceStrategy(request);
+    return this.starforceOptimizationService.calculateOptimalStarforceStrategy(
+      request,
+    );
   }
 }
