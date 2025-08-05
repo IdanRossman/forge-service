@@ -316,6 +316,21 @@ export class BulkItemCalculationDto {
     example: 'Arcane Umbra Weapon',
   })
   itemName?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Type of equipment (weapon, secondary, gloves, helm, top, bottom, etc.)',
+    example: 'weapon',
+  })
+  itemType?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Base attack of the weapon (required for weapons to calculate 2% visible ATT gains)',
+    example: 250,
+    minimum: 0,
+  })
+  base_attack?: number;
 }
 
 // Bulk calculation DTOs

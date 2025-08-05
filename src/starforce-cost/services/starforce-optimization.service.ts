@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { StarForceCalculationService } from './starforce-calculation.service';
-import { StarforceOptimizationRequestDto, StarforceOptimizationResponseDto } from '../contracts';
+import { StarforceStatCalculationService } from './starforce-stat-calculation.service';
+import {
+  StarforceOptimizationRequestDto,
+  StarforceOptimizationResponseDto,
+} from '../contracts';
 
 interface EnhancementStep {
   itemIndex: number;
@@ -41,10 +45,11 @@ interface Recommendation {
 export class StarforceOptimizationService {
   constructor(
     private readonly calculationService: StarForceCalculationService,
+    private readonly statCalculationService: StarforceStatCalculationService,
   ) {}
 
   /**
-   * Calculate optimal starforcing strategy to maximize stars gained within budget
+   * Calculate optimal starforcing strategy to maximize stat value gained within budget
    */
   calculateOptimalStarforceStrategy(
     request: StarforceOptimizationRequestDto,
@@ -58,25 +63,48 @@ export class StarforceOptimizationService {
     } = request;
 
     // Generate all possible enhancement steps with efficiency scores
-    const enhancementSteps = this.generateAllPossibleSteps(items, isInteractive, events);
-    
-    // Sort by cost efficiency (stars per meso)
-    const sortedSteps = enhancementSteps.sort((a, b) => b.efficiency - a.efficiency);
+    const enhancementSteps = this.generateAllPossibleSteps(
+      items,
+      isInteractive,
+      events,
+    );
+
+    // Sort by cost efficiency (stat value per meso)
+    const sortedSteps = enhancementSteps.sort(
+      (a, b) => b.efficiency - a.efficiency,
+    );
 
     // Build optimal action plan within budget
-    const actionPlan = this.buildOptimalActionPlan(sortedSteps, availableMeso, items, events, riskTolerance);
+    const actionPlan = this.buildOptimalActionPlan(
+      sortedSteps,
+      availableMeso,
+      items,
+      events,
+      riskTolerance,
+    );
 
     // Calculate what's achievable vs what was requested
-    const achievableTargets = this.calculateAchievableTargets(actionPlan, items);
-    
+    const achievableTargets = this.calculateAchievableTargets(
+      actionPlan,
+      items,
+    );
+
     // Generate warnings and recommendations
-    const analysis = this.analyzeOptimizationResults(items, achievableTargets, availableMeso, actionPlan, events);
+    const analysis = this.analyzeOptimizationResults(
+      items,
+      achievableTargets,
+      availableMeso,
+      actionPlan,
+      events,
+    );
 
     return {
       budget: {
         available: availableMeso,
         used: actionPlan.reduce((sum, step) => sum + step.expectedCost, 0),
-        remaining: availableMeso - actionPlan.reduce((sum, step) => sum + step.expectedCost, 0),
+        remaining:
+          availableMeso -
+          actionPlan.reduce((sum, step) => sum + step.expectedCost, 0),
       },
       starsGained: {
         total: actionPlan.length,
@@ -84,29 +112,45 @@ export class StarforceOptimizationService {
       },
       actionPlan,
       achievableTargets,
-      originalTargets: items.map(item => ({
+      originalTargets: items.map((item) => ({
         itemName: item.itemName || `Level ${item.itemLevel} Item`,
         fromStar: item.fromStar,
         requestedTarget: item.toStar,
-        achievableTarget: achievableTargets.find(t => t.itemIndex === items.indexOf(item))?.achievableTarget || item.fromStar,
-        starsShortfall: item.toStar - (achievableTargets.find(t => t.itemIndex === items.indexOf(item))?.achievableTarget || item.fromStar),
+        achievableTarget:
+          achievableTargets.find((t) => t.itemIndex === items.indexOf(item))
+            ?.achievableTarget || item.fromStar,
+        starsShortfall:
+          item.toStar -
+          (achievableTargets.find((t) => t.itemIndex === items.indexOf(item))
+            ?.achievableTarget || item.fromStar),
       })),
       analysis,
-      recommendations: this.generateBudgetRecommendations(analysis, availableMeso, items, events),
+      recommendations: this.generateBudgetRecommendations(
+        analysis,
+        availableMeso,
+        items,
+        events,
+      ),
     };
   }
 
-  private generateAllPossibleSteps(items: any[], isInteractive?: boolean, events?: any): EnhancementStep[] {
+  private generateAllPossibleSteps(
+    items: any[],
+    isInteractive?: boolean,
+    events?: any,
+  ): EnhancementStep[] {
     const steps: EnhancementStep[] = [];
-    
+
     items.forEach((item, itemIndex) => {
       const startingStar = item.fromStar;
       const targetStar = item.toStar;
-      
+      const itemType = this.statCalculationService.determineItemType(item);
+      const baseAttack = item.base_attack; // Use base_attack from Equipment interface
+
       // If item is below 15★, create a single "tap to 15★" step
       if (startingStar < 15) {
         const tapTo15Star = Math.min(15, targetStar);
-        
+
         // Calculate cost for tapping to 15★ (or target if lower)
         const tapCalculation = this.calculationService.calculateStarForceCost({
           fromStar: startingStar,
@@ -119,29 +163,44 @@ export class StarforceOptimizationService {
           events,
         });
 
+        // Calculate stat gains for this range
+        const statGains = this.statCalculationService.calculateStatGains(
+          startingStar,
+          tapTo15Star,
+          item.itemLevel,
+          itemType,
+          baseAttack,
+        );
+
         steps.push({
           itemIndex,
-          itemName: item.itemName || `Level ${item.itemLevel} Item #${itemIndex + 1}`,
+          itemName:
+            item.itemName ||
+            `Level ${item.itemLevel} ${itemType} #${itemIndex + 1}`,
           fromStar: startingStar,
           toStar: tapTo15Star,
           expectedCost: tapCalculation.averageCost,
           expectedBooms: 0, // No boom risk below 15★
-          efficiency: (tapTo15Star - startingStar) / tapCalculation.averageCost, // Stars per meso
+          efficiency: statGains.totalValue / tapCalculation.averageCost, // Stat value per meso
           riskLevel: 'Low',
-          priority: this.calculateStepPriority(startingStar, tapCalculation.averageCost, 'Low'),
+          priority: this.calculateStepPriority(
+            startingStar,
+            tapCalculation.averageCost,
+            'Low',
+          ),
           canAfford: true,
           spareRequirement: 0,
           availableSpares: item.spareCount || 0,
           isGuaranteed: false,
         });
       }
-      
+
       // Generate individual steps for 15★ and above
       const enhanceStart = Math.max(startingStar, 15);
       for (let star = enhanceStart; star < targetStar; star++) {
         // Skip if we already handled this range with tap to 15
         if (star < 15) continue;
-        
+
         // Calculate cost for this single star enhancement
         const stepCalculation = this.calculationService.calculateStarForceCost({
           fromStar: star,
@@ -154,24 +213,40 @@ export class StarforceOptimizationService {
           events,
         });
 
+        // Calculate stat gains for this single star
+        const statGains = this.statCalculationService.calculateStatGains(
+          star,
+          star + 1,
+          item.itemLevel,
+          itemType,
+          baseAttack,
+        );
+
         // Risk assessment
         const riskAssessment = this.assessStepRisk(item, star);
         const canAfford = this.canAffordStep(item, star);
 
         steps.push({
           itemIndex,
-          itemName: item.itemName || `Level ${item.itemLevel} Item #${itemIndex + 1}`,
+          itemName:
+            item.itemName ||
+            `Level ${item.itemLevel} ${itemType} #${itemIndex + 1}`,
           fromStar: star,
           toStar: star + 1,
           expectedCost: stepCalculation.averageCost,
           expectedBooms: stepCalculation.averageSpareCount || 0,
-          efficiency: 1 / stepCalculation.averageCost, // Stars per meso
+          efficiency: statGains.totalValue / stepCalculation.averageCost, // Stat value per meso
           riskLevel: riskAssessment.level,
-          priority: this.calculateStepPriority(star, stepCalculation.averageCost, riskAssessment.level),
+          priority: this.calculateStepPriority(
+            star,
+            stepCalculation.averageCost,
+            riskAssessment.level,
+          ),
           canAfford,
           spareRequirement: stepCalculation.averageSpareCount || 0,
           availableSpares: item.spareCount || 0,
-          isGuaranteed: events?.fiveTenFifteen && (star === 4 || star === 9 || star === 14),
+          isGuaranteed:
+            events?.fiveTenFifteen && (star === 4 || star === 9 || star === 14),
         });
       }
     });
@@ -180,72 +255,73 @@ export class StarforceOptimizationService {
   }
 
   private buildOptimalActionPlan(
-    sortedSteps: EnhancementStep[], 
-    budget: number, 
-    items: any[], 
-    events?: any, 
-    riskTolerance: 'conservative' | 'balanced' | 'aggressive' = 'balanced'
+    sortedSteps: EnhancementStep[],
+    budget: number,
+    items: any[],
+    events?: any,
+    riskTolerance: 'conservative' | 'balanced' | 'aggressive' = 'balanced',
   ): ActionStep[] {
     const actionPlan: ActionStep[] = [];
     let remainingBudget = budget;
     let stepNumber = 1;
-    
+
     // Track current star level for each item
-    const currentStars = items.map(item => item.fromStar);
-    
+    const currentStars = items.map((item) => item.fromStar);
+
     // Generate ALL possible steps regardless of budget or risk - let users decide their own limits!
     // This accounts for lucky scenarios where users spend much less than expected
     const allPossibleSteps: ActionStep[] = [];
     let cumulativeCost = 0;
     let allStepsStepNumber = 1;
-    
+
     // Keep processing until all items reach their targets
     while (true) {
       let bestStep: EnhancementStep | null = null;
       let bestEfficiency = 0;
-      
+
       // Find the best available step for current state
       for (const step of sortedSteps) {
         const itemIndex = step.itemIndex;
         const currentStar = currentStars[itemIndex];
         const targetStar = items[itemIndex].toStar;
-        
+
         // Skip if item already at target
         if (currentStar >= targetStar) {
           continue;
         }
-        
+
         // Check if this step is the next logical step for this item
         if (step.fromStar !== currentStar) {
           continue;
         }
-        
+
         // This is a valid step - check if it's the best efficiency so far
         if (step.efficiency > bestEfficiency) {
           bestStep = step;
           bestEfficiency = step.efficiency;
         }
       }
-      
+
       // If no valid step found, we've completed all possible enhancements
       if (!bestStep) {
         break;
       }
-      
+
       // Add special note for guaranteed successes or budget warnings
       let specialNote: string | undefined = undefined;
       if (bestStep.isGuaranteed) {
-        specialNote = "★ GUARANTEED SUCCESS (5/10/15 Event) ★";
+        specialNote = '★ GUARANTEED SUCCESS (5/10/15 Event) ★';
       } else if (cumulativeCost + bestStep.expectedCost > budget) {
-        specialNote = `⚠️ EXCEEDS BUDGET - Expected cost: ${((cumulativeCost + bestStep.expectedCost) / 1000000).toFixed(0)}M (${(((cumulativeCost + bestStep.expectedCost - budget) / 1000000)).toFixed(0)}M over)`;
+        specialNote = `⚠️ EXCEEDS BUDGET - Expected cost: ${((cumulativeCost + bestStep.expectedCost) / 1000000).toFixed(0)}M (${((cumulativeCost + bestStep.expectedCost - budget) / 1000000).toFixed(0)}M over)`;
       }
-      
+
       // Add this step to the complete plan
       const stepAction: ActionStep = {
         step: allStepsStepNumber++,
-        action: bestStep.fromStar < 15 ? 
-          `Tap ${bestStep.itemName} to ${bestStep.toStar}★` : 
-          `Enhance ${bestStep.itemName}`,
+        action:
+          bestStep.fromStar < 15
+            ? `Tap ${bestStep.itemName} to ${bestStep.toStar}★`
+            : `Enhance ${bestStep.itemName}`,
         fromStar: bestStep.fromStar,
         toStar: bestStep.toStar,
         expectedCost: bestStep.expectedCost,
@@ -256,23 +332,24 @@ export class StarforceOptimizationService {
         remainingBudget: budget - (cumulativeCost + bestStep.expectedCost),
         specialNote,
       };
-      
+
       allPossibleSteps.push(stepAction);
-      
+
       // Also add to budget-constrained plan if within budget and risk tolerance
-      if (cumulativeCost + bestStep.expectedCost <= budget && 
-          this.isStepAllowedByRiskTolerance(bestStep, riskTolerance) &&
-          remainingBudget >= bestStep.expectedCost) {
-        
+      if (
+        cumulativeCost + bestStep.expectedCost <= budget &&
+        this.isStepAllowedByRiskTolerance(bestStep, riskTolerance) &&
+        remainingBudget >= bestStep.expectedCost
+      ) {
         actionPlan.push({
           ...stepAction,
           step: stepNumber++,
           remainingBudget: remainingBudget - bestStep.expectedCost,
         });
-        
+
         remainingBudget -= bestStep.expectedCost;
       }
-      
+
       cumulativeCost += bestStep.expectedCost;
       currentStars[bestStep.itemIndex] = bestStep.toStar; // Update to the new star level
     }
@@ -285,32 +362,36 @@ export class StarforceOptimizationService {
    * Check if a step is allowed based on risk tolerance
    */
   private isStepAllowedByRiskTolerance(
-    step: EnhancementStep, 
-    riskTolerance: 'conservative' | 'balanced' | 'aggressive'
+    step: EnhancementStep,
+    riskTolerance: 'conservative' | 'balanced' | 'aggressive',
   ): boolean {
     // Always allow guaranteed steps
     if (step.isGuaranteed) {
       return true;
     }
-    
+
     // Check based on risk tolerance
     switch (riskTolerance) {
       case 'conservative':
         // Allow low risk always, medium risk below 20★, high risk below 17★
-        return step.riskLevel === 'Low' || 
-               (step.riskLevel === 'Medium' && step.fromStar < 20) ||
-               (step.riskLevel === 'High' && step.fromStar < 17);
-        
+        return (
+          step.riskLevel === 'Low' ||
+          (step.riskLevel === 'Medium' && step.fromStar < 20) ||
+          (step.riskLevel === 'High' && step.fromStar < 17)
+        );
+
       case 'balanced':
         // Allow low and medium risk always, high risk below 22★
-        return step.riskLevel === 'Low' || 
-               step.riskLevel === 'Medium' || 
-               (step.riskLevel === 'High' && step.fromStar < 22);
-        
+        return (
+          step.riskLevel === 'Low' ||
+          step.riskLevel === 'Medium' ||
+          (step.riskLevel === 'High' && step.fromStar < 22)
+        );
+
       case 'aggressive':
         // Allow all risk levels
         return true;
-        
+
       default:
         return step.riskLevel === 'Low' || step.riskLevel === 'Medium';
     }
@@ -318,17 +399,20 @@ export class StarforceOptimizationService {
 
   private calculateAchievableTargets(actionPlan: ActionStep[], items: any[]) {
     const achievableTargets = items.map((item, index) => {
-      const itemName = item.itemName || `Level ${item.itemLevel} Item #${index + 1}`;
-      const itemSteps = actionPlan.filter(step => 
-        step.action.includes(itemName) || step.action.includes(`Item #${index + 1}`)
+      const itemName =
+        item.itemName || `Level ${item.itemLevel} Item #${index + 1}`;
+      const itemSteps = actionPlan.filter(
+        (step) =>
+          step.action.includes(itemName) ||
+          step.action.includes(`Item #${index + 1}`),
       );
-      
+
       // Calculate final star level by considering multi-star steps
       let achievableTarget = item.fromStar;
-      itemSteps.forEach(step => {
+      itemSteps.forEach((step) => {
         achievableTarget = step.toStar; // Each step brings us to its toStar level
       });
-      
+
       return {
         itemIndex: index,
         itemName,
@@ -342,15 +426,36 @@ export class StarforceOptimizationService {
     return achievableTargets;
   }
 
-  private analyzeOptimizationResults(items: any[], achievableTargets: any[], budget: number, actionPlan: ActionStep[], events?: any) {
-    const totalStarsRequested = items.reduce((sum, item) => sum + (item.toStar - item.fromStar), 0);
-    const totalStarsAchievable = achievableTargets.reduce((sum, target) => sum + target.starsGained, 0);
-    const budgetUsed = actionPlan.reduce((sum, step) => sum + step.expectedCost, 0);
-    const budgetEfficiency = totalStarsAchievable / budgetUsed; // Stars per meso
+  private analyzeOptimizationResults(
+    items: any[],
+    achievableTargets: any[],
+    budget: number,
+    actionPlan: ActionStep[],
+    events?: any,
+  ) {
+    const totalStarsRequested = items.reduce(
+      (sum, item) => sum + (item.toStar - item.fromStar),
+      0,
+    );
+    const totalStarsAchievable = achievableTargets.reduce(
+      (sum, target) => sum + target.starsGained,
+      0,
+    );
+    const budgetUsed = actionPlan.reduce(
+      (sum, step) => sum + step.expectedCost,
+      0,
+    );
+    const budgetEfficiency = totalStarsAchievable / budgetUsed; // Overall stars achieved per meso spent
 
-    const itemsFullyAchievable = achievableTargets.filter(target => target.starsShortfall === 0).length;
-    const itemsPartiallyAchievable = achievableTargets.filter(target => target.starsGained > 0 && target.starsShortfall > 0).length;
-    const itemsNotAchievable = achievableTargets.filter(target => target.starsGained === 0).length;
+    const itemsFullyAchievable = achievableTargets.filter(
+      (target) => target.starsShortfall === 0,
+    ).length;
+    const itemsPartiallyAchievable = achievableTargets.filter(
+      (target) => target.starsGained > 0 && target.starsShortfall > 0,
+    ).length;
+    const itemsNotAchievable = achievableTargets.filter(
+      (target) => target.starsGained === 0,
+    ).length;
 
     const analysis: any = {
       starsMetrics: {
@@ -374,18 +479,25 @@ export class StarforceOptimizationService {
 
     // Add event benefits if applicable
     if (events?.fiveTenFifteen) {
-      const guaranteedSteps = actionPlan.filter(step => step.specialNote?.includes('GUARANTEED')).length;
+      const guaranteedSteps = actionPlan.filter((step) =>
+        step.specialNote?.includes('GUARANTEED'),
+      ).length;
       analysis.eventBenefits = {
         guaranteedSuccesses: guaranteedSteps,
         mesoSaved: guaranteedSteps * 150000000, // Rough estimate
-        riskReduced: "15★→16★ steps are now risk-free",
+        riskReduced: '15★→16★ steps are now risk-free',
       };
     }
 
     return analysis;
   }
 
-  private generateBudgetRecommendations(analysis: any, budget: number, items: any[], events?: any): Recommendation[] {
+  private generateBudgetRecommendations(
+    analysis: any,
+    budget: number,
+    items: any[],
+    events?: any,
+  ): Recommendation[] {
     const recommendations: Recommendation[] = [];
 
     // Event-specific recommendations
@@ -393,7 +505,8 @@ export class StarforceOptimizationService {
       recommendations.push({
         type: 'event',
         priority: 'high',
-        message: '5/10/15 Event Active! Prioritize 15★→16★ enhancements first - they\'re guaranteed and cost-efficient.',
+        message:
+          "5/10/15 Event Active! Prioritize 15★→16★ enhancements first - they're guaranteed and cost-efficient.",
       });
     }
 
@@ -430,7 +543,8 @@ export class StarforceOptimizationService {
     }
 
     if (analysis.budgetMetrics.utilizationRate < 80) {
-      const unusedBudget = budget - (budget * analysis.budgetMetrics.utilizationRate / 100);
+      const unusedBudget =
+        budget - (budget * analysis.budgetMetrics.utilizationRate) / 100;
       recommendations.push({
         type: 'opportunity',
         priority: 'low',
@@ -441,12 +555,16 @@ export class StarforceOptimizationService {
     return recommendations;
   }
 
-  private calculateStepPriority(starLevel: number, cost: number, riskLevel: string) {
+  private calculateStepPriority(
+    starLevel: number,
+    cost: number,
+    riskLevel: string,
+  ) {
     let priority = 100 - starLevel; // Lower stars = higher priority (cheaper)
-    
+
     // Adjust for cost efficiency
     priority += (1000000000 / cost) * 10; // Cheaper steps get higher priority
-    
+
     // Adjust for risk
     if (riskLevel === 'Low') priority += 20;
     else if (riskLevel === 'Medium') priority += 10;
@@ -463,18 +581,21 @@ export class StarforceOptimizationService {
 
   private calculateStarsGainedByItem(actionPlan: ActionStep[], items: any[]) {
     return items.map((item, index) => {
-      const itemName = item.itemName || `Level ${item.itemLevel} Item #${index + 1}`;
-      const itemSteps = actionPlan.filter(step => 
-        step.action.includes(itemName) || step.action.includes(`Item #${index + 1}`)
+      const itemName =
+        item.itemName || `Level ${item.itemLevel} Item #${index + 1}`;
+      const itemSteps = actionPlan.filter(
+        (step) =>
+          step.action.includes(itemName) ||
+          step.action.includes(`Item #${index + 1}`),
       );
-      
+
       // Calculate final star level and total stars gained considering multi-star steps
       let finalStar = item.fromStar;
-      itemSteps.forEach(step => {
+      itemSteps.forEach((step) => {
         finalStar = step.toStar;
       });
       const starsGained = finalStar - item.fromStar;
-      
+
       return {
         itemName,
         originalTarget: item.toStar,
@@ -487,13 +608,18 @@ export class StarforceOptimizationService {
   }
 
   private assessPlanRisk(actionPlan: ActionStep[]) {
-    const highRiskSteps = actionPlan.filter(step => step.riskLevel === 'High' || step.riskLevel === 'Critical').length;
-    const mediumRiskSteps = actionPlan.filter(step => step.riskLevel === 'Medium').length;
-    
+    const highRiskSteps = actionPlan.filter(
+      (step) => step.riskLevel === 'High' || step.riskLevel === 'Critical',
+    ).length;
+    const mediumRiskSteps = actionPlan.filter(
+      (step) => step.riskLevel === 'Medium',
+    ).length;
+
     return {
       highRiskSteps,
       mediumRiskSteps,
-      overallRisk: highRiskSteps > 0 ? 'High' : mediumRiskSteps > 3 ? 'Medium' : 'Low',
+      overallRisk:
+        highRiskSteps > 0 ? 'High' : mediumRiskSteps > 3 ? 'Medium' : 'Low',
     };
   }
 
@@ -509,7 +635,7 @@ export class StarforceOptimizationService {
       return {
         level: 'High',
         warning: `High-risk ${starLevel}★→${starLevel + 1}★ enhancement`,
-        recommendation: 'Consider using safeguard for protection'
+        recommendation: 'Consider using safeguard for protection',
       };
     }
 
@@ -517,7 +643,7 @@ export class StarforceOptimizationService {
       return {
         level: 'Medium',
         warning: `Boom-possible ${starLevel}★→${starLevel + 1}★ enhancement`,
-        recommendation: 'Have backup plan ready'
+        recommendation: 'Have backup plan ready',
       };
     }
 
