@@ -48,6 +48,7 @@ const JOB_TO_CLASS_MAP: Record<string, MapleClass> = {
 
   // Thief jobs
   'night-lord': MapleClass.THIEF,
+  'night-walker': MapleClass.THIEF,
   shadower: MapleClass.THIEF,
   'dual-blade': MapleClass.THIEF,
   xenon: MapleClass.THIEF,
