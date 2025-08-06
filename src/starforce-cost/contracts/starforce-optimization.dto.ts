@@ -50,6 +50,16 @@ export interface StarforceOptimizationResponseDto {
     cumulativeCost: number;
     remainingBudget: number;
     specialNote?: string;
+    statGains: {
+      jobStat: number;
+      visibleAtt: number;
+      magicAtt: number;
+      weaponAtt: number;
+      hp: number;
+      mp: number;
+      def: number;
+      totalValue: number;
+    };
   }>;
   achievableTargets: Array<{
     itemIndex: number;

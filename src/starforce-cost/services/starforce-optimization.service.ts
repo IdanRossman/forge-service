@@ -34,6 +34,16 @@ interface ActionStep {
   cumulativeCost: number;
   remainingBudget: number;
   specialNote?: string;
+  statGains: {
+    jobStat: number;
+    visibleAtt: number;
+    magicAtt: number;
+    weaponAtt: number;
+    hp: number;
+    mp: number;
+    def: number;
+    totalValue: number;
+  };
 }
 
 interface Recommendation {
@@ -307,6 +317,19 @@ export class StarforceOptimizationService {
         break;
       }
 
+      // Calculate stat gains for this step to include in response
+      const item = items[bestStep.itemIndex];
+      const itemType = this.statCalculationService.determineItemType(item);
+      const baseAttack = item.base_attack;
+      
+      const stepStatGains = this.statCalculationService.calculateStatGains(
+        bestStep.fromStar,
+        bestStep.toStar,
+        item.itemLevel,
+        itemType,
+        baseAttack,
+      );
+
       // Add special note for guaranteed successes or budget warnings
       let specialNote: string | undefined = undefined;
       if (bestStep.isGuaranteed) {
@@ -331,6 +354,7 @@ export class StarforceOptimizationService {
         cumulativeCost: cumulativeCost + bestStep.expectedCost,
         remainingBudget: budget - (cumulativeCost + bestStep.expectedCost),
         specialNote,
+        statGains: stepStatGains,
       };
 
       allPossibleSteps.push(stepAction);
