@@ -159,22 +159,13 @@ export class StarforceStatCalculationService {
         gains.def = 5; // 5% def bonus
       }
 
-      // IMPORTANT: Weapons should STILL get their special bonuses at 15★+
+      // IMPORTANT: Weapons should STILL get their MP bonuses at 15★+
       if (itemType === 'weapon') {
         // MP gains continue at 15★+ (max tier)
         gains.mp = 25;
 
-        // 2% base attack bonus continues at 15★+ (in ADDITION to high-star visible ATT)
-        if (baseAttack) {
-          gains.visibleAtt += baseAttack * 0.02; // ADD to existing high-star visible ATT
-        } else {
-          // Fallback: estimate based on item level if no base attack provided
-          const estimatedBaseAttack = itemLevel * 3.5; // Rough estimation
-          gains.visibleAtt += estimatedBaseAttack * 0.02;
-          console.warn(
-            `Missing base_attack for weapon at level ${itemLevel}, using estimated value: ${estimatedBaseAttack}`,
-          );
-        }
+        // NOTE: 2% base attack bonus ONLY applies to 0★→14★ enhancements
+        // At 15★+, weapons only get the visible ATT from the high-star table
       }
     }
 
