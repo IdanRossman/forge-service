@@ -55,6 +55,7 @@ export interface StarforceOptimizationResponseDto {
       visibleAtt: number;
       magicAtt: number;
       weaponAtt: number;
+      attack: number; // Simplified: visibleAtt + weaponAtt combined
       hp: number;
       mp: number;
       def: number;

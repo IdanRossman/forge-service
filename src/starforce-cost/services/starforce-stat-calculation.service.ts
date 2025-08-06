@@ -7,6 +7,7 @@ export interface StatGains {
   visibleAtt: number;
   magicAtt: number;
   weaponAtt: number;
+  attack: number; // Simplified: visibleAtt + weaponAtt combined
   hp: number;
   mp: number;
   def: number;
@@ -16,13 +17,13 @@ export interface StatGains {
 @Injectable()
 export class StarforceStatCalculationService {
   private readonly statWeights = {
-    jobStat: 4, // Job stats are valuable
-    visibleAtt: 10, // Attack power is premium
-    magicAtt: 10, // Magic attack equivalent
-    weaponAtt: 8, // Weapon attack on non-weapons
-    hp: 0.01, // HP has minimal impact
-    mp: 0.005, // MP even less
-    def: 0.5, // Defense has some value
+    jobStat: 1, // Job stats are valuable
+    visibleAtt: 5, // Attack power is premium
+    magicAtt: 0, // Magic attack equivalent
+    weaponAtt: 5, // Weapon attack on non-weapons
+    hp: 0, // HP has minimal impact
+    mp: 0, // MP even less
+    def: 0, // Defense has some value
   };
 
   /**
@@ -40,6 +41,7 @@ export class StarforceStatCalculationService {
       visibleAtt: 0,
       magicAtt: 0,
       weaponAtt: 0,
+      attack: 0,
       hp: 0,
       mp: 0,
       def: 0,
@@ -57,6 +59,7 @@ export class StarforceStatCalculationService {
       totalGains.visibleAtt += starGains.visibleAtt;
       totalGains.magicAtt += starGains.magicAtt;
       totalGains.weaponAtt += starGains.weaponAtt;
+      totalGains.attack += starGains.attack;
       totalGains.hp += starGains.hp;
       totalGains.mp += starGains.mp;
       totalGains.def += starGains.def;
@@ -82,6 +85,7 @@ export class StarforceStatCalculationService {
       visibleAtt: 0,
       magicAtt: 0,
       weaponAtt: 0,
+      attack: 0,
       hp: 0,
       mp: 0,
       def: 0,
@@ -159,6 +163,12 @@ export class StarforceStatCalculationService {
         gains.def = 5; // 5% def bonus
       }
 
+      // Gloves continue to get +1 ATT/MATT at every star level 15★+
+      if (itemType === 'gloves') {
+        gains.visibleAtt += 1; // +1 ATT in addition to high-star gains
+        gains.magicAtt += 1;   // +1 MATT in addition to high-star gains
+      }
+
       // IMPORTANT: Weapons should STILL get their MP bonuses at 15★+
       if (itemType === 'weapon') {
         // MP gains continue at 15★+ (max tier)
@@ -168,6 +178,9 @@ export class StarforceStatCalculationService {
         // At 15★+, weapons only get the visible ATT from the high-star table
       }
     }
+
+    // Set simplified attack field based on item type
+    gains.attack = gains.visibleAtt + gains.weaponAtt; // Combine both attack values
 
     return gains;
   }
@@ -247,14 +260,13 @@ export class StarforceStatCalculationService {
         gains.visibleStat = tierData.stat;
       }
 
-      if (itemType === 'armor') {
+      if (itemType === 'armor' || itemType === 'gloves') {
         gains.weaponAtt = tierData.nonWeaponAtt[starIndex] || 0;
-        // Note: Armor only gets weaponAtt, not magicAtt (was double-counting before)
+        // Note: Armor and gloves get weaponAtt from the non-weapon ATT table
         gains.def = levelTier === '250';
       } else if (itemType === 'weapon') {
         gains.visibleAtt = tierData.weaponAtt[starIndex] || 0;
       }
-      // Gloves don't get special 15★+ bonuses in this table
     }
 
     return gains;
@@ -285,7 +297,7 @@ export class StarforceStatCalculationService {
       return 'armor';
     }
 
-    // Try both 'type' (database field) and 'itemType' (DTO field)
+    // Try 'type' (database field), 'itemType' (DTO field), and 'slot' (frontend field)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const equipmentType: string =
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
@@ -296,7 +308,11 @@ export class StarforceStatCalculationService {
           typeof item.itemType === 'string'
           ? // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             (item.itemType as string)
-          : '';
+          : // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            typeof item.slot === 'string'
+            ? // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+              (item.slot as string)
+            : '';
 
     if (equipmentType) {
       switch (equipmentType.toLowerCase()) {

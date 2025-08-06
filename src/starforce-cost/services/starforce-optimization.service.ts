@@ -39,6 +39,7 @@ interface ActionStep {
     visibleAtt: number;
     magicAtt: number;
     weaponAtt: number;
+    attack: number;
     hp: number;
     mp: number;
     def: number;
