@@ -53,13 +53,23 @@ export class StarForceCalculationService {
   ) {}
 
   private getStrategy(strategy?: StarforceStrategy): StarforceCalculationStrategy {
-    switch (strategy) {
-      case StarforceStrategy.NEW_KMS:
-        return this.newKmsStrategy;
-      case StarforceStrategy.LEGACY:
-      default:
-        return this.legacyStrategy;
+    // Normalize the strategy value and handle common typos
+    const normalizedStrategy = strategy?.toLowerCase();
+    
+    // Handle new-kms variations
+    if (normalizedStrategy === 'new-kms' || normalizedStrategy === StarforceStrategy.NEW_KMS) {
+      return this.newKmsStrategy;
     }
+    
+    // Handle legacy variations (including common typos)
+    if (normalizedStrategy === 'legacy' || 
+        normalizedStrategy === 'legecy' ||  // Handle typo
+        normalizedStrategy === StarforceStrategy.LEGACY) {
+      return this.legacyStrategy;
+    }
+    
+    // Default to legacy strategy
+    return this.legacyStrategy;
   }
 
   /**

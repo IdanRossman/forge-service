@@ -61,6 +61,7 @@ export class StarforceCostService {
           itemLevel: request.itemLevel,
           isInteractive: request.isInteractive,
           safeguardEnabled: request.safeguardEnabled || false,
+          strategy: request.strategy, // Pass the strategy parameter
           events: request.events,
           returnCostResults: true, // Request cost results for luck analysis
         });
