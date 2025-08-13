@@ -1,4 +1,4 @@
-import { StarforceCalculationStrategy } from '../strategies';
+import { StarforceCalculationStrategy } from '../strategies/starforce-strategy.interface';
 
 export interface EventConfiguration {
   thirtyOff?: boolean;
@@ -162,9 +162,123 @@ export function determineOutcome(
     }
   }
 
+  // Boom reduction event
+  if (events.boomReduction && currentStar <= 21) {
+    const boomReduction = boom * 0.3;
+    boom = boom * 0.7;
+    maintain = maintain + boomReduction;
+  }
+
   const outcome = Math.random();
   if (outcome <= success) return 'Success';
   if (outcome <= success + maintain) return 'Maintain';
   if (outcome <= success + maintain + decrease) return 'Decrease';
   return 'Boom';
+}
+
+/**
+ * Generic starforce calculation function that can be used by any strategy
+ */
+export function calculateStarForce(
+  strategy: StarforceCalculationStrategy,
+  itemLevel: number,
+  currentLevel: number,
+  targetLevel: number,
+  events: EventConfiguration = {},
+  returnCostResults = false,
+): StarForceCalculation {
+  const { safeguard = false } = events || {};
+
+  if (!strategy.inputValidation(itemLevel, currentLevel, targetLevel)) {
+    return {
+      currentLevel,
+      targetLevel,
+      averageCost: 0,
+      medianCost: 0,
+      p75Cost: 0,
+      averageBooms: 0,
+      medianBooms: 0,
+      p75Booms: 0,
+    };
+  }
+
+  const trials = targetLevel <= 22 ? 1000 : 250;
+  const costResults: number[] = [];
+  const boomResults: number[] = [];
+
+  for (let i = 0; i < trials; i++) {
+    // Each trial gets both meso and boom data from the same experiment
+    const { totalCost, totalBooms } = performEnhancementExperiment(
+      currentLevel,
+      targetLevel,
+      itemLevel,
+      events,
+      safeguard,
+      strategy,
+    );
+    costResults.push(totalCost);
+    boomResults.push(totalBooms);
+  }
+
+  // Calculate average values
+  const avgCost = costResults.reduce((sum, cost) => sum + cost, 0) / trials;
+  const avgBooms = boomResults.reduce((sum, booms) => sum + booms, 0) / trials;
+
+  // Calculate median values
+  const sortedCosts = [...costResults].sort((a, b) => a - b);
+  const sortedBooms = [...boomResults].sort((a, b) => a - b);
+
+  const medianCost =
+    trials % 2 === 0
+      ? (sortedCosts[trials / 2 - 1] + sortedCosts[trials / 2]) / 2
+      : sortedCosts[Math.floor(trials / 2)];
+
+  const medianBooms =
+    trials % 2 === 0
+      ? (sortedBooms[trials / 2 - 1] + sortedBooms[trials / 2]) / 2
+      : sortedBooms[Math.floor(trials / 2)];
+
+  // Calculate 75th percentile values
+  const p75Index = Math.floor(trials * 0.75);
+  const p75Cost = sortedCosts[p75Index];
+  const p75Booms = sortedBooms[p75Index];
+
+  return {
+    currentLevel,
+    targetLevel,
+    averageCost: Math.round(avgCost),
+    averageBooms: Math.round(avgBooms * 100) / 100,
+    medianCost: Math.round(medianCost),
+    medianBooms: Math.round(medianBooms * 100) / 100,
+    p75Cost: Math.round(p75Cost),
+    p75Booms: Math.round(p75Booms * 100) / 100,
+    costResults: returnCostResults ? costResults : undefined,
+    boomResults: returnCostResults ? boomResults : undefined,
+  };
+}
+
+/**
+ * Generic attempt cost calculation function that can be used by any strategy
+ */
+export function calculateAttemptCost(
+  strategy: StarforceCalculationStrategy,
+  currentStar: number,
+  itemLevel: number,
+  safeguard: boolean,
+  events: EventConfiguration,
+): number {
+  let multiplier = 1;
+
+  // 30% off event
+  if (events.thirtyOff) {
+    multiplier -= 0.3;
+  }
+
+  // Safeguard cost increase
+  if (safeguard) {
+    multiplier += strategy.getSafeguardMultiplierIncrease(currentStar);
+  }
+
+  const cost = getBaseCost(currentStar, itemLevel) * multiplier;
+  return Math.round(cost);
 }
