@@ -98,6 +98,58 @@ export class NewKmsStarforceStrategy implements StarforceCalculationStrategy {
     );
   }
 
+  getBaseCost(currentStar: number, itemLevel: number): number {
+    return this.kmsCost(currentStar, itemLevel);
+  }
+
+  private makeMesoFn(divisor: number, currentStarExp = 2.7, extraMult = 1) {
+    return (currentStar: number, itemLevel: number) =>
+      100 *
+      Math.round(
+        (extraMult * itemLevel ** 3 * (currentStar + 1) ** currentStarExp) /
+          divisor +
+          10,
+      );
+  }
+
+  private preSaviorMesoFn(currentStar: number) {
+    if (currentStar >= 15) {
+      return this.makeMesoFn(20000);
+    }
+    if (currentStar >= 10) {
+      return this.makeMesoFn(40000);
+    }
+    return this.makeMesoFn(2500, 1);
+  }
+
+  private kmsMesoFn(currentStar: number) {
+    switch (currentStar) {
+      case 11:
+        return this.makeMesoFn(22000);
+      case 12:
+        return this.makeMesoFn(15000);
+      case 13:
+        return this.makeMesoFn(11000);
+      case 14:
+        return this.makeMesoFn(7500);
+      case 17:
+        return this.makeMesoFn(20000, 2.7, 4 / 3);
+      case 18:
+        return this.makeMesoFn(20000, 2.7, 20 / 7);
+      case 19:
+        return this.makeMesoFn(20000, 2.7, 40 / 9);
+      case 21:
+        return this.makeMesoFn(20000, 2.7, 8 / 5);
+      default:
+        return this.preSaviorMesoFn(currentStar);
+    }
+  }
+
+  private kmsCost(currentStar: number, itemLevel: number): number {
+    const mesoFn = this.kmsMesoFn(currentStar);
+    return mesoFn(currentStar, itemLevel);
+  }
+
   getMaxStars(): number {
     return 30;
   }

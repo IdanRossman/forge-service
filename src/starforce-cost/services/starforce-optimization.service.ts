@@ -322,7 +322,7 @@ export class StarforceOptimizationService {
       const item = items[bestStep.itemIndex];
       const itemType = this.statCalculationService.determineItemType(item);
       const baseAttack = item.base_attack;
-      
+
       const stepStatGains = this.statCalculationService.calculateStatGains(
         bestStep.fromStar,
         bestStep.toStar,

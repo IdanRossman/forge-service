@@ -32,6 +32,8 @@ export interface StarforceCalculationStrategy {
     events: EventConfiguration,
   ): number;
 
+  getBaseCost?(currentStar: number, itemLevel: number): number;
+
   inputValidation(
     itemLevel: number,
     currentLevel: number,

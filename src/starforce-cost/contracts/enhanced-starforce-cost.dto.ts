@@ -94,6 +94,11 @@ export class EnhancedStarforceCostRequestDto {
         description: 'Star catching event (+5% success rate)',
         example: true,
       },
+      boomReduction: {
+        type: 'boolean',
+        description: 'Boom reduction event (reduces boom chance by 30%)',
+        example: false,
+      },
       mvpDiscount: {
         type: 'number',
         description: 'MVP discount percentage (0-0.3)',
@@ -117,6 +122,7 @@ export class EnhancedStarforceCostRequestDto {
     thirtyOff?: boolean;
     fiveTenFifteen?: boolean;
     starCatching?: boolean;
+    boomReduction?: boolean;
     mvpDiscount?: number;
     yohiTapEvent?: boolean;
   };
