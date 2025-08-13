@@ -1,3 +1,5 @@
+import { StarforceStrategy } from './enhanced-starforce-cost.dto';
+
 export interface StarforceOptimizationRequestDto {
   items: Array<{
     itemLevel: number;
@@ -12,6 +14,7 @@ export interface StarforceOptimizationRequestDto {
   }>;
   availableMeso: number;
   isInteractive?: boolean;
+  strategy?: StarforceStrategy;
   events?: {
     thirtyOff?: boolean;
     fiveTenFifteen?: boolean;

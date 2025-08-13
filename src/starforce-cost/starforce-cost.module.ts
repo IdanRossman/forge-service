@@ -6,6 +6,7 @@ import { StarForceCalculationService } from './services/starforce-calculation.se
 import { StarforceStatCalculationService } from './services/starforce-stat-calculation.service';
 import { LuckAnalysisService } from './services/luck-analysis.service';
 import { LegacyStarforceStrategy } from './strategies';
+import { NewKmsStarforceStrategy } from './strategies/new-kms-starforce.strategy';
 
 @Module({
   controllers: [StarforceCostController],
@@ -16,6 +17,7 @@ import { LegacyStarforceStrategy } from './strategies';
     StarforceStatCalculationService,
     LuckAnalysisService,
     LegacyStarforceStrategy,
+    NewKmsStarforceStrategy,
   ],
   exports: [
     StarforceCostService,

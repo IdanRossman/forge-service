@@ -8,7 +8,7 @@ import {
 import { StarforceCalculationStrategy } from './starforce-strategy.interface';
 
 @Injectable()
-export class LegacyStarforceStrategy implements StarforceCalculationStrategy {
+export class NewKmsStarforceStrategy implements StarforceCalculationStrategy {
   calculateStarForce(
     itemLevel: number,
     currentLevel: number,
@@ -49,34 +49,38 @@ export class LegacyStarforceStrategy implements StarforceCalculationStrategy {
       13: [0.35, 0.65, 0, 0],
       14: [0.3, 0.7, 0, 0],
       15: [0.3, 0.679, 0, 0.021],
-      16: [0.3, 0, 0.679, 0.021],
-      17: [0.3, 0, 0.679, 0.021],
-      18: [0.3, 0, 0.672, 0.028],
-      19: [0.3, 0, 0.672, 0.028],
-      20: [0.3, 0.63, 0, 0.07],
-      21: [0.3, 0, 0.63, 0.07],
-      22: [0.03, 0, 0.776, 0.194],
-      23: [0.02, 0, 0.686, 0.294],
-      24: [0.01, 0, 0.594, 0.396],
-      25: [0.01, 0, 0.594, 0.396],
+      16: [0.3, 0.679, 0, 0.021],
+      17: [0.15, 0.782, 0, 0.068],
+      18: [0.15, 0.782, 0, 0.068],
+      19: [0.15, 0.765, 0, 0.085],
+      20: [0.3, 0.595, 0, 0.105],
+      21: [0.15, 0.7225, 0, 0.1275],
+      22: [0.15, 0.68, 0, 0.17],
+      23: [0.1, 0.72, 0, 0.18],
+      24: [0.1, 0.72, 0, 0.18],
+      25: [0.1, 0.72, 0, 0.18],
+      26: [0.07, 0.744, 0, 0.186],
+      27: [0.05, 0.76, 0, 0.19],
+      28: [0.03, 0.776, 0, 0.194],
+      29: [0.01, 0.792, 0, 0.198],
     };
 
     const [success, maintain, decrease, boom] = rates[currentStar] || [
-      0.3, 0.4, 0, 0.3,
+      0.01, 0.792, 0, 0.198,
     ];
 
     return { success, maintain, decrease, boom };
   }
 
   getSafeguardMultiplierIncrease(currentStar: number): number {
-    if (currentStar >= 15 && currentStar <= 16) {
-      return 1;
+    if (currentStar >= 15 && currentStar <= 17) {
+      return 2;
     }
     return 0;
   }
 
   getSafeguardStars(currentStar: number): boolean {
-    return currentStar >= 15 && currentStar <= 16;
+    return currentStar >= 15 && currentStar <= 17;
   }
 
   calculateAttemptCost(
@@ -95,7 +99,7 @@ export class LegacyStarforceStrategy implements StarforceCalculationStrategy {
   }
 
   getMaxStars(): number {
-    return 25;
+    return 30;
   }
 
   inputValidation(
@@ -107,7 +111,7 @@ export class LegacyStarforceStrategy implements StarforceCalculationStrategy {
       itemLevel > 0 &&
       currentLevel >= 0 &&
       targetLevel > currentLevel &&
-      targetLevel <= 25
+      targetLevel <= 30
     );
   }
 }

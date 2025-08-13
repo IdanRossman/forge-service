@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { LegacyStarforceStrategy } from '../strategies/legacy-starforce.strategy';
+import { NewKmsStarforceStrategy } from '../strategies/new-kms-starforce.strategy';
 import { StarforceCalculationStrategy } from '../strategies/starforce-strategy.interface';
+import { StarforceStrategy } from '../contracts';
 
 export interface StarForceCalculationRequest {
   fromStar: number;
@@ -12,6 +14,7 @@ export interface StarForceCalculationRequest {
   safeguardEnabled?: boolean;
   returnCostResults?: boolean;
   calculationVersion?: 'legacy' | 'enhanced';
+  strategy?: StarforceStrategy;
   events?: {
     thirtyOff?: boolean;
     fiveTenFifteen?: boolean;
@@ -44,10 +47,19 @@ export interface StarForceCalculationResponse {
 
 @Injectable()
 export class StarForceCalculationService {
-  constructor(private readonly legacyStrategy: LegacyStarforceStrategy) {}
+  constructor(
+    private readonly legacyStrategy: LegacyStarforceStrategy,
+    private readonly newKmsStrategy: NewKmsStarforceStrategy,
+  ) {}
 
-  private getStrategy(): StarforceCalculationStrategy {
-    return this.legacyStrategy;
+  private getStrategy(strategy?: StarforceStrategy): StarforceCalculationStrategy {
+    switch (strategy) {
+      case StarforceStrategy.NEW_KMS:
+        return this.newKmsStrategy;
+      case StarforceStrategy.LEGACY:
+      default:
+        return this.legacyStrategy;
+    }
   }
 
   /**
@@ -65,20 +77,21 @@ export class StarForceCalculationService {
       spareCost,
       safeguardEnabled = false,
       returnCostResults = false,
+      strategy,
       events = {},
     } = request;
 
     // Validate input
     this.validateRequest(request);
 
-    // Select appropriate strategy (defaults to legacy for now)
-    const strategy = this.getStrategy();
+    // Select appropriate strategy
+    const selectedStrategy = this.getStrategy(strategy);
 
     // Determine optimal trial count based on star level
     const trials = this.getOptimalTrialCount(toStar);
 
     // Run the calculation using the selected strategy
-    const calculation = strategy.calculateStarForce(
+    const calculation = selectedStrategy.calculateStarForce(
       itemLevel,
       fromStar,
       toStar,
@@ -192,11 +205,11 @@ export class StarForceCalculationService {
       spareCost,
     } = request;
 
-    if (fromStar < 0 || fromStar > 25) {
+    if (fromStar < 0 || fromStar > 29) {
       throw new Error('fromStar must be between 0 and 25');
     }
 
-    if (toStar < 0 || toStar > 25) {
+    if (toStar < 0 || toStar > 30) {
       throw new Error('toStar must be between 0 and 25');
     }
 
