@@ -30,6 +30,7 @@ export class StarforceCostService {
       spareCount: request.spareCount,
       spareCost: request.spareCost,
       safeguardEnabled: request.safeguardEnabled,
+      strategy: request.strategy,
       events: request.events,
       returnCostResults: true, // Always return cost results for distribution calculations
     });
@@ -95,6 +96,7 @@ export class StarforceCostService {
         toStar: item.toStar,
         isInteractive: request.isInteractive,
         safeguardEnabled: item.safeguardEnabled,
+        strategy: request.strategy,
         events: request.events, // Shared events across all items
         spareCount: item.spareCount,
         spareCost: item.spareCost,

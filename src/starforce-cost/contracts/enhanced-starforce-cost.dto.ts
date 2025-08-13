@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+// Strategy selection enum
+export enum StarforceStrategy {
+  LEGACY = 'legacy',
+  NEW_KMS = 'new-kms',
+}
+
 // Enhanced starforce calculation request DTO
 export class EnhancedStarforceCostRequestDto {
   @ApiProperty({
@@ -32,6 +38,14 @@ export class EnhancedStarforceCostRequestDto {
     default: false,
   })
   isInteractive: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Starforce strategy to use for calculations',
+    enum: StarforceStrategy,
+    example: StarforceStrategy.LEGACY,
+    default: StarforceStrategy.LEGACY,
+  })
+  strategy?: StarforceStrategy;
 
   @ApiPropertyOptional({
     description: 'Number of spare items available',
@@ -341,6 +355,14 @@ export class BulkEnhancedStarforceRequestDto {
     default: false,
   })
   isInteractive: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Starforce strategy to use for all calculations',
+    enum: StarforceStrategy,
+    example: StarforceStrategy.LEGACY,
+    default: StarforceStrategy.LEGACY,
+  })
+  strategy?: StarforceStrategy;
 
   @ApiProperty({
     description: 'Server-wide event configurations that apply to all items',

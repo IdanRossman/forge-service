@@ -36,6 +36,7 @@ export class StarforceCostController {
           'Calculate costs for a full equipment set with 30% off event and star catching active for all items, with individual safeguard choices',
         value: {
           isInteractive: true,
+          strategy: 'legacy',
           events: {
             thirtyOff: true,
             starCatching: true,
@@ -156,6 +157,7 @@ export class StarforceCostController {
           'Calculate costs without any events for worst-case planning',
         value: {
           isInteractive: true,
+          strategy: 'legacy',
           events: {},
           items: [
             {
@@ -166,6 +168,39 @@ export class StarforceCostController {
               spareCount: 5,
               spareCost: 1000000000,
               itemName: 'High-Risk Enhancement',
+            },
+          ],
+        },
+      },
+      newKmsStrategy: {
+        summary: '🚀 New KMS Strategy (30 Stars)',
+        description:
+          'Using the new KMS strategy for 30-star enhancements with improved rates',
+        value: {
+          isInteractive: true,
+          strategy: 'new-kms',
+          events: {
+            boomReduction: true,
+            starCatching: true,
+          },
+          items: [
+            {
+              itemLevel: 200,
+              fromStar: 20,
+              toStar: 25,
+              safeguardEnabled: false,
+              spareCount: 10,
+              spareCost: 2000000000,
+              itemName: 'Genesis Weapon (25★ Push)',
+            },
+            {
+              itemLevel: 200,
+              fromStar: 25,
+              toStar: 30,
+              safeguardEnabled: false,
+              spareCount: 20,
+              spareCost: 2000000000,
+              itemName: 'Genesis Weapon (30★ Push)',
             },
           ],
         },
@@ -204,9 +239,11 @@ export class StarforceCostController {
           fromStar: 12,
           toStar: 17,
           isInteractive: true,
+          strategy: 'legacy',
           safeguardEnabled: false,
           events: {
             starCatching: true,
+            boomReduction: true,
           },
         },
       },
@@ -217,6 +254,7 @@ export class StarforceCostController {
           fromStar: 12,
           toStar: 17,
           isInteractive: true,
+          strategy: 'legacy',
           actualCost: 1200000000,
           safeguardEnabled: true,
           events: {

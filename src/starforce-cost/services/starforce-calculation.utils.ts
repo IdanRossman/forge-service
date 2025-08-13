@@ -1,5 +1,29 @@
 import { StarforceCalculationStrategy } from '../strategies/starforce-strategy.interface';
 
+// Quickselect algorithm for efficient percentile calculation - O(n) vs O(n log n)
+function quickSelect(arr: number[], k: number): number {
+  if (arr.length === 1) return arr[0];
+  
+  const pivot = arr[Math.floor(Math.random() * arr.length)];
+  const lows = arr.filter(x => x < pivot);
+  const highs = arr.filter(x => x > pivot);
+  const pivots = arr.filter(x => x === pivot);
+  
+  if (k < lows.length) {
+    return quickSelect(lows, k);
+  } else if (k < lows.length + pivots.length) {
+    return pivot;
+  } else {
+    return quickSelect(highs, k - lows.length - pivots.length);
+  }
+}
+
+// Cache for rate calculations to avoid repeated computations
+const rateCache = new Map<string, { success: number; maintain: number; decrease: number; boom: number }>();
+
+// Cache for cost calculations
+const costCache = new Map<string, number>();
+
 export interface EventConfiguration {
   thirtyOff?: boolean;
   fiveTenFifteen?: boolean;
@@ -135,44 +159,53 @@ export function determineOutcome(
     return 'Success';
   }
 
-  let { success, maintain, decrease, boom } =
-    strategy.getStarforceRates(currentStar);
+  // Create cache key for this specific combination
+  const cacheKey = `${currentStar}-${!!events.starCatching}-${!!events.boomReduction}-${safeguard && strategy.getSafeguardStars(currentStar)}`;
+  
+  let rates = rateCache.get(cacheKey);
+  if (!rates) {
+    let { success, maintain, decrease, boom } =
+      strategy.getStarforceRates(currentStar);
 
-  // Safeguard removes boom chance
-  if (safeguard && strategy.getSafeguardStars(currentStar)) {
-    if (decrease > 0) {
-      decrease = decrease + boom;
-    } else {
-      maintain = maintain + boom;
+    // Safeguard removes boom chance
+    if (safeguard && strategy.getSafeguardStars(currentStar)) {
+      if (decrease > 0) {
+        decrease = decrease + boom;
+      } else {
+        maintain = maintain + boom;
+      }
+      boom = 0;
     }
-    boom = 0;
-  }
 
-  // Star catching (5% multiplicative)
-  if (events.starCatching) {
-    success = Math.min(1, success * 1.05);
-    const leftOver = 1 - success;
+    // Star catching (5% multiplicative)
+    if (events.starCatching) {
+      success = Math.min(1, success * 1.05);
+      const leftOver = 1 - success;
 
-    if (decrease === 0) {
-      maintain = (maintain * leftOver) / (maintain + boom);
-      boom = leftOver - maintain;
-    } else {
-      decrease = (decrease * leftOver) / (decrease + boom);
-      boom = leftOver - decrease;
+      if (decrease === 0) {
+        maintain = (maintain * leftOver) / (maintain + boom);
+        boom = leftOver - maintain;
+      } else {
+        decrease = (decrease * leftOver) / (decrease + boom);
+        boom = leftOver - decrease;
+      }
     }
-  }
 
-  // Boom reduction event
-  if (events.boomReduction && currentStar <= 21) {
-    const boomReduction = boom * 0.3;
-    boom = boom * 0.7;
-    maintain = maintain + boomReduction;
+    // Boom reduction event
+    if (events.boomReduction && currentStar <= 21) {
+      const boomReduction = boom * 0.3;
+      boom = boom * 0.7;
+      maintain = maintain + boomReduction;
+    }
+
+    rates = { success, maintain, decrease, boom };
+    rateCache.set(cacheKey, rates);
   }
 
   const outcome = Math.random();
-  if (outcome <= success) return 'Success';
-  if (outcome <= success + maintain) return 'Maintain';
-  if (outcome <= success + maintain + decrease) return 'Decrease';
+  if (outcome <= rates.success) return 'Success';
+  if (outcome <= rates.success + rates.maintain) return 'Maintain';
+  if (outcome <= rates.success + rates.maintain + rates.decrease) return 'Decrease';
   return 'Boom';
 }
 
@@ -202,7 +235,8 @@ export function calculateStarForce(
     };
   }
 
-  const trials = targetLevel <= 22 ? 1000 : 250;
+  // Optimized trial count: fewer trials for very high stars
+  const trials = targetLevel <= 22 ? 1000 : targetLevel <= 25 ? 250 : 100;
   const costResults: number[] = [];
   const boomResults: number[] = [];
 
@@ -224,24 +258,14 @@ export function calculateStarForce(
   const avgCost = costResults.reduce((sum, cost) => sum + cost, 0) / trials;
   const avgBooms = boomResults.reduce((sum, booms) => sum + booms, 0) / trials;
 
-  // Calculate median values
-  const sortedCosts = [...costResults].sort((a, b) => a - b);
-  const sortedBooms = [...boomResults].sort((a, b) => a - b);
-
-  const medianCost =
-    trials % 2 === 0
-      ? (sortedCosts[trials / 2 - 1] + sortedCosts[trials / 2]) / 2
-      : sortedCosts[Math.floor(trials / 2)];
-
-  const medianBooms =
-    trials % 2 === 0
-      ? (sortedBooms[trials / 2 - 1] + sortedBooms[trials / 2]) / 2
-      : sortedBooms[Math.floor(trials / 2)];
-
-  // Calculate 75th percentile values
+  // Optimized: Use quickselect for percentiles - O(n) vs O(n log n) sorting
+  const medianIndex = Math.floor(trials / 2);
   const p75Index = Math.floor(trials * 0.75);
-  const p75Cost = sortedCosts[p75Index];
-  const p75Booms = sortedBooms[p75Index];
+  
+  const medianCost = quickSelect([...costResults], medianIndex);
+  const medianBooms = quickSelect([...boomResults], medianIndex);
+  const p75Cost = quickSelect([...costResults], p75Index);
+  const p75Booms = quickSelect([...boomResults], p75Index);
 
   return {
     currentLevel,
@@ -257,6 +281,7 @@ export function calculateStarForce(
   };
 }
 
+
 /**
  * Generic attempt cost calculation function that can be used by any strategy
  */
@@ -267,18 +292,26 @@ export function calculateAttemptCost(
   safeguard: boolean,
   events: EventConfiguration,
 ): number {
-  let multiplier = 1;
+  // Create cache key for cost calculation
+  const cacheKey = `${currentStar}-${itemLevel}-${safeguard}-${!!events.thirtyOff}`;
+  
+  let cost = costCache.get(cacheKey);
+  if (cost === undefined) {
+    let multiplier = 1;
 
-  // 30% off event
-  if (events.thirtyOff) {
-    multiplier -= 0.3;
+    // 30% off event
+    if (events.thirtyOff) {
+      multiplier -= 0.3;
+    }
+
+    // Safeguard cost increase
+    if (safeguard) {
+      multiplier += strategy.getSafeguardMultiplierIncrease(currentStar);
+    }
+
+    cost = Math.round(getBaseCost(currentStar, itemLevel) * multiplier);
+    costCache.set(cacheKey, cost);
   }
 
-  // Safeguard cost increase
-  if (safeguard) {
-    multiplier += strategy.getSafeguardMultiplierIncrease(currentStar);
-  }
-
-  const cost = getBaseCost(currentStar, itemLevel) * multiplier;
-  return Math.round(cost);
+  return cost;
 }
