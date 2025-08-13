@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { calculateCostPercentile } from './starforce-calculation.utils';
 
 export interface LuckAnalysisResult {
   actualCost: number;
@@ -16,7 +15,7 @@ export class LuckAnalysisService {
    * Analyze how lucky/unlucky a user's actual cost was compared to simulation results
    */
   analyzeLuck(actualCost: number, costResults: number[]): LuckAnalysisResult {
-    const analysis = calculateCostPercentile(actualCost, costResults);
+    const analysis = this.calculateCostPercentile(actualCost, costResults);
 
     return {
       actualCost,
@@ -83,5 +82,71 @@ export class LuckAnalysisService {
     if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
     if (amount >= 1000) return `${(amount / 1000).toFixed(1)}K`;
     return amount.toString();
+  }
+
+  /**
+   * Calculate what percentile an actual cost falls into
+   */
+  private calculateCostPercentile(
+    actualCost: number,
+    costResults: number[],
+  ): {
+    percentile: number;
+    luckRating: 'Very Lucky' | 'Lucky' | 'Average' | 'Unlucky' | 'Very Unlucky';
+    description: string;
+    betterThanPercent: number;
+    worseThanPercent: number;
+  } {
+    const sortedCosts = [...costResults].sort((a, b) => a - b);
+    const totalTrials = sortedCosts.length;
+
+    // Find how many results were worse (higher cost) than the actual cost
+    const betterThanActual = sortedCosts.filter(
+      (cost) => cost < actualCost,
+    ).length;
+    const worseThanActual = sortedCosts.filter(
+      (cost) => cost > actualCost,
+    ).length;
+
+    // Calculate percentile (what percentage of results were worse than actual)
+    const percentile =
+      Math.round((betterThanActual / totalTrials) * 10000) / 100;
+    const worseThanPercent =
+      Math.round((worseThanActual / totalTrials) * 10000) / 100;
+    const betterThanPercent = percentile;
+
+    // Determine luck rating
+    let luckRating:
+      | 'Very Lucky'
+      | 'Lucky'
+      | 'Average'
+      | 'Unlucky'
+      | 'Very Unlucky';
+    let description: string;
+
+    if (percentile <= 10) {
+      luckRating = 'Very Lucky';
+      description = `🍀 Extremely lucky! Your cost was lower than ${percentile}% of all attempts`;
+    } else if (percentile <= 25) {
+      luckRating = 'Lucky';
+      description = `✨ Lucky! Your cost was lower than ${percentile}% of all attempts`;
+    } else if (percentile <= 75) {
+      luckRating = 'Average';
+      description = `📊 Average luck. Your cost was around the ${percentile}th percentile`;
+    } else if (percentile <= 90) {
+      luckRating = 'Unlucky';
+      description = `😬 Unlucky. Your cost was higher than ${betterThanPercent}% of attempts`;
+    } else {
+      luckRating = 'Very Unlucky';
+      description = `💸 Very unlucky! Your cost was higher than ${betterThanPercent}% of attempts`;
+    }
+
+    return {
+      percentile,
+      luckRating,
+      description,
+      betterThanPercent,
+      worseThanPercent,
+    };
   }
 }

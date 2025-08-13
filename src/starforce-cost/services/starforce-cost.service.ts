@@ -7,7 +7,6 @@ import {
 } from '../contracts';
 import { StarForceCalculationService } from './starforce-calculation.service';
 import { LuckAnalysisService } from './luck-analysis.service';
-import { calculateStarForce } from './starforce-calculation.utils';
 
 @Injectable()
 export class StarforceCostService {
@@ -32,6 +31,7 @@ export class StarforceCostService {
       spareCost: request.spareCost,
       safeguardEnabled: request.safeguardEnabled,
       events: request.events,
+      returnCostResults: true, // Always return cost results for distribution calculations
     });
 
     const response: EnhancedStarforceCostResponseDto = {
@@ -52,20 +52,17 @@ export class StarforceCostService {
 
     // Add luck analysis if actualCost provided
     if (request.actualCost !== undefined) {
-      // Get cost results for luck analysis
-      const detailedCalculation = calculateStarForce(
-        request.itemLevel,
-        request.fromStar,
-        request.toStar,
-        {
-          safeguard: request.safeguardEnabled || false,
-          thirtyOff: request.events?.thirtyOff,
-          fiveTenFifteen: request.events?.fiveTenFifteen,
-          starCatching: request.events?.starCatching,
-          mvpDiscount: request.events?.mvpDiscount,
-        },
-        true, // Return cost results
-      );
+      // Use the calculation service instead - request cost results for luck analysis
+      const detailedCalculation =
+        this.calculationService.calculateStarForceCost({
+          fromStar: request.fromStar,
+          toStar: request.toStar,
+          itemLevel: request.itemLevel,
+          isInteractive: request.isInteractive,
+          safeguardEnabled: request.safeguardEnabled || false,
+          events: request.events,
+          returnCostResults: true, // Request cost results for luck analysis
+        });
 
       if (detailedCalculation.costResults) {
         const luckAnalysis = this.luckAnalysisService.analyzeLuck(
@@ -146,5 +143,4 @@ export class StarforceCostService {
       },
     };
   }
-
 }

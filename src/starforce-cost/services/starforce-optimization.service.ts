@@ -331,6 +331,12 @@ export class StarforceOptimizationService {
         baseAttack,
       );
 
+      // Add missing attack property (sum of visible and weapon attack)
+      const stepStatGainsWithAttack = {
+        ...stepStatGains,
+        attack: stepStatGains.visibleAtt + stepStatGains.weaponAtt,
+      };
+
       // Add special note for guaranteed successes or budget warnings
       let specialNote: string | undefined = undefined;
       if (bestStep.isGuaranteed) {
@@ -355,7 +361,7 @@ export class StarforceOptimizationService {
         cumulativeCost: cumulativeCost + bestStep.expectedCost,
         remainingBudget: budget - (cumulativeCost + bestStep.expectedCost),
         specialNote,
-        statGains: stepStatGains,
+        statGains: stepStatGainsWithAttack,
       };
 
       allPossibleSteps.push(stepAction);
