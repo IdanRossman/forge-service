@@ -52,22 +52,29 @@ export class StarForceCalculationService {
     private readonly newKmsStrategy: NewKmsStarforceStrategy,
   ) {}
 
-  private getStrategy(strategy?: StarforceStrategy): StarforceCalculationStrategy {
+  private getStrategy(
+    strategy?: StarforceStrategy,
+  ): StarforceCalculationStrategy {
     // Normalize the strategy value and handle common typos
     const normalizedStrategy = strategy?.toLowerCase();
-    
+
     // Handle new-kms variations
-    if (normalizedStrategy === 'new-kms' || normalizedStrategy === StarforceStrategy.NEW_KMS) {
+    if (
+      normalizedStrategy === 'new-kms' ||
+      normalizedStrategy === StarforceStrategy.NEW_KMS
+    ) {
       return this.newKmsStrategy;
     }
-    
+
     // Handle legacy variations (including common typos)
-    if (normalizedStrategy === 'legacy' || 
-        normalizedStrategy === 'legecy' ||  // Handle typo
-        normalizedStrategy === StarforceStrategy.LEGACY) {
+    if (
+      normalizedStrategy === 'legacy' ||
+      normalizedStrategy === 'legecy' || // Handle typo
+      normalizedStrategy === StarforceStrategy.LEGACY
+    ) {
       return this.legacyStrategy;
     }
-    
+
     // Default to legacy strategy
     return this.legacyStrategy;
   }
@@ -216,11 +223,10 @@ export class StarForceCalculationService {
     } = request;
 
     if (fromStar < 0 || fromStar > 29) {
-      throw new Error('fromStar must be between 0 and 25');
+      throw new Error('fromStar must be between 0 and 29');
     }
-
     if (toStar < 0 || toStar > 30) {
-      throw new Error('toStar must be between 0 and 25');
+      throw new Error('toStar must be between 0 and 30');
     }
 
     if (fromStar >= toStar) {

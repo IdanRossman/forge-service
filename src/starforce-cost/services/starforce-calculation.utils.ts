@@ -3,12 +3,12 @@ import { StarforceCalculationStrategy } from '../strategies/starforce-strategy.i
 // Quickselect algorithm for efficient percentile calculation - O(n) vs O(n log n)
 function quickSelect(arr: number[], k: number): number {
   if (arr.length === 1) return arr[0];
-  
+
   const pivot = arr[Math.floor(Math.random() * arr.length)];
-  const lows = arr.filter(x => x < pivot);
-  const highs = arr.filter(x => x > pivot);
-  const pivots = arr.filter(x => x === pivot);
-  
+  const lows = arr.filter((x) => x < pivot);
+  const highs = arr.filter((x) => x > pivot);
+  const pivots = arr.filter((x) => x === pivot);
+
   if (k < lows.length) {
     return quickSelect(lows, k);
   } else if (k < lows.length + pivots.length) {
@@ -19,7 +19,10 @@ function quickSelect(arr: number[], k: number): number {
 }
 
 // Cache for rate calculations to avoid repeated computations
-const rateCache = new Map<string, { success: number; maintain: number; decrease: number; boom: number }>();
+const rateCache = new Map<
+  string,
+  { success: number; maintain: number; decrease: number; boom: number }
+>();
 
 // Cache for cost calculations
 const costCache = new Map<string, number>();
@@ -107,8 +110,13 @@ export function performEnhancementExperiment(
   let totalBooms = 0;
   let decreaseCount = 0;
 
+  // Calculate once for the entire experiment
+  const isNewKms = strategy.getMaxStars() === 30; // new-kms supports 30 stars, legacy only 25
+
   while (currentStar < targetStars) {
-    const chanceTime = decreaseCount === 2;
+    // Chance time is disabled for new-kms strategy (KMS server behavior)
+    const chanceTime = !isNewKms && decreaseCount === 2;
+
     totalCost += strategy.calculateAttemptCost(
       currentStar,
       itemLevel,
@@ -152,8 +160,11 @@ export function determineOutcome(
   safeguard: boolean,
   strategy: StarforceCalculationStrategy,
 ): StarforceOutcome {
+  // 5/10/15 event is disabled for new-kms strategy (KMS server behavior)
+  const isNewKms = strategy.getMaxStars() === 30;
   if (
     events.fiveTenFifteen &&
+    !isNewKms &&
     (currentStar === 5 || currentStar === 10 || currentStar === 15)
   ) {
     return 'Success';
@@ -161,7 +172,7 @@ export function determineOutcome(
 
   // Create cache key for this specific combination
   const cacheKey = `${currentStar}-${!!events.starCatching}-${!!events.boomReduction}-${safeguard && strategy.getSafeguardStars(currentStar)}`;
-  
+
   let rates = rateCache.get(cacheKey);
   if (!rates) {
     let { success, maintain, decrease, boom } =
@@ -169,10 +180,16 @@ export function determineOutcome(
 
     // Safeguard removes boom chance
     if (safeguard && strategy.getSafeguardStars(currentStar)) {
-      if (decrease > 0) {
-        decrease = decrease + boom;
-      } else {
+      if (isNewKms) {
+        // KMS safeguard: always add boom chance to maintain (no decrease in KMS)
         maintain = maintain + boom;
+      } else {
+        // Non-KMS safeguard: add boom chance to decrease if available, otherwise maintain
+        if (decrease > 0) {
+          decrease = decrease + boom;
+        } else {
+          maintain = maintain + boom;
+        }
       }
       boom = 0;
     }
@@ -205,7 +222,8 @@ export function determineOutcome(
   const outcome = Math.random();
   if (outcome <= rates.success) return 'Success';
   if (outcome <= rates.success + rates.maintain) return 'Maintain';
-  if (outcome <= rates.success + rates.maintain + rates.decrease) return 'Decrease';
+  if (outcome <= rates.success + rates.maintain + rates.decrease)
+    return 'Decrease';
   return 'Boom';
 }
 
@@ -236,7 +254,7 @@ export function calculateStarForce(
   }
 
   // Optimized trial count: fewer trials for very high stars
-  const trials = targetLevel <= 22 ? 1000 : targetLevel <= 25 ? 250 : 100;
+  const trials = targetLevel <= 22 ? 1000 : 1000; // Use 1000 for all levels for testing
   const costResults: number[] = [];
   const boomResults: number[] = [];
 
@@ -261,7 +279,7 @@ export function calculateStarForce(
   // Optimized: Use quickselect for percentiles - O(n) vs O(n log n) sorting
   const medianIndex = Math.floor(trials / 2);
   const p75Index = Math.floor(trials * 0.75);
-  
+
   const medianCost = quickSelect([...costResults], medianIndex);
   const medianBooms = quickSelect([...boomResults], medianIndex);
   const p75Cost = quickSelect([...costResults], p75Index);
@@ -281,7 +299,6 @@ export function calculateStarForce(
   };
 }
 
-
 /**
  * Generic attempt cost calculation function that can be used by any strategy
  */
@@ -294,7 +311,7 @@ export function calculateAttemptCost(
 ): number {
   // Create cache key for cost calculation
   const cacheKey = `${currentStar}-${itemLevel}-${safeguard}-${!!events.thirtyOff}`;
-  
+
   let cost = costCache.get(cacheKey);
   if (cost === undefined) {
     let multiplier = 1;
@@ -309,7 +326,12 @@ export function calculateAttemptCost(
       multiplier += strategy.getSafeguardMultiplierIncrease(currentStar);
     }
 
-    cost = Math.round(getBaseCost(currentStar, itemLevel) * multiplier);
+    // Use strategy-specific base cost if available, otherwise fallback to general function
+    const baseCost = strategy.getBaseCost
+      ? strategy.getBaseCost(currentStar, itemLevel)
+      : getBaseCost(currentStar, itemLevel);
+
+    cost = Math.round(baseCost * multiplier);
     costCache.set(cacheKey, cost);
   }
 
