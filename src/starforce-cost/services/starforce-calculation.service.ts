@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { calculateStarForce } from './starforce-calculation.utils';
+import { LegacyStarforceStrategy } from '../strategies/legacy-starforce.strategy';
+import { StarforceCalculationStrategy } from '../strategies/starforce-strategy.interface';
 
 export interface StarForceCalculationRequest {
   fromStar: number;
@@ -9,6 +10,8 @@ export interface StarForceCalculationRequest {
   spareCount?: number;
   spareCost?: number;
   safeguardEnabled?: boolean;
+  returnCostResults?: boolean;
+  calculationVersion?: 'legacy' | 'enhanced';
   events?: {
     thirtyOff?: boolean;
     fiveTenFifteen?: boolean;
@@ -35,10 +38,18 @@ export interface StarForceCalculationResponse {
     max: number;
     standardDeviation: number;
   };
+  costResults?: number[];
+  boomResults?: number[];
 }
 
 @Injectable()
 export class StarForceCalculationService {
+  constructor(private readonly legacyStrategy: LegacyStarforceStrategy) {}
+
+  private getStrategy(): StarforceCalculationStrategy {
+    return this.legacyStrategy;
+  }
+
   /**
    * Main calculation method that handles all starforce cost scenarios
    */
@@ -53,17 +64,21 @@ export class StarForceCalculationService {
       spareCount,
       spareCost,
       safeguardEnabled = false,
+      returnCostResults = false,
       events = {},
     } = request;
 
     // Validate input
     this.validateRequest(request);
 
+    // Select appropriate strategy (defaults to legacy for now)
+    const strategy = this.getStrategy();
+
     // Determine optimal trial count based on star level
     const trials = this.getOptimalTrialCount(toStar);
 
-    // Run the calculation
-    const calculation = calculateStarForce(
+    // Run the calculation using the selected strategy
+    const calculation = strategy.calculateStarForce(
       itemLevel,
       fromStar,
       toStar,
@@ -73,9 +88,8 @@ export class StarForceCalculationService {
         thirtyOff: events.thirtyOff,
         fiveTenFifteen: events.fiveTenFifteen,
         starCatching: events.starCatching,
-        mvpDiscount: events.mvpDiscount,
       },
-      true, // Return cost results for analysis
+      returnCostResults, // Use the returnCostResults parameter
     );
 
     // Build response
@@ -111,6 +125,12 @@ export class StarForceCalculationService {
     } else if (spareCount !== undefined && spareCost !== undefined) {
       // Fallback for legacy compatibility
       response.totalInvestment = response.medianCost + spareCount * spareCost;
+    }
+
+    // Include raw results if requested
+    if (returnCostResults) {
+      response.costResults = calculation.costResults;
+      response.boomResults = calculation.boomResults;
     }
 
     return response;

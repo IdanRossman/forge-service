@@ -5,6 +5,7 @@ import { StarforceCostController } from './starforce-cost.controller';
 import { StarForceCalculationService } from './services/starforce-calculation.service';
 import { StarforceStatCalculationService } from './services/starforce-stat-calculation.service';
 import { LuckAnalysisService } from './services/luck-analysis.service';
+import { LegacyStarforceStrategy } from './strategies';
 
 @Module({
   controllers: [StarforceCostController],
@@ -14,6 +15,7 @@ import { LuckAnalysisService } from './services/luck-analysis.service';
     StarForceCalculationService,
     StarforceStatCalculationService,
     LuckAnalysisService,
+    LegacyStarforceStrategy,
   ],
   exports: [
     StarforceCostService,
