@@ -275,11 +275,12 @@ export class BulkPotentialItemWithCubeDto {
   selectedOption: string;
 
   @ApiProperty({
-    description: 'Type of cube to use for this specific item',
+    description: 'Type of cube to use for this specific item. Use null for smart optimization (auto-select cheapest cube type).',
     enum: CubeType,
     example: CubeType.RED,
+    nullable: true,
   })
-  cubeType: CubeType;
+  cubeType: CubeType | null;
 
   @ApiPropertyOptional({
     description: 'Whether DMT (Double Miracle Time) event is active for this item',

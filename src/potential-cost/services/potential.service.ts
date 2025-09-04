@@ -14,7 +14,7 @@ import {
   BulkPotentialItemWithCubeResponseDto,
   DropdownOptionGroup,
 } from '../contracts/potential-calculation.dto';
-import { ItemType, PotentialTier } from '../contracts/potential-enums';
+import { ItemType, PotentialTier, CubeType } from '../contracts/potential-enums';
 import { PotentialCalculationService } from './potential-calculation.service';
 import { PotentialCostService } from './potential-cost.service';
 import { CubeRatesDataService } from './cube-rates-data.service';
@@ -299,18 +299,12 @@ export class PotentialService {
   public calculatePotential(
     request: PotentialCalculationRequestDto,
   ): PotentialCalculationResponseDto {
-    console.log('=== DEBUG calculatePotential ===');
-    console.log('Request:', JSON.stringify(request, null, 2));
-    
     const {
       itemType: clientItemType,
       cubeType,
       itemLevel,
       isDMT = false,
     } = request;
-    
-    console.log('Extracted cubeType:', cubeType);
-    console.log('Extracted cubeType type:', typeof cubeType);
 
     // Map client item type to backend ItemType
     const itemType = this.mapClientItemType(clientItemType);
@@ -437,9 +431,6 @@ export class PotentialService {
   public calculateBulkPotentialWithIndividualCubes(
     request: BulkPotentialCalculationWithIndividualCubesRequestDto,
   ): BulkPotentialCalculationWithIndividualCubesResponseDto {
-    console.log('=== DEBUG service calculateBulkPotentialWithIndividualCubes ===');
-    console.log('Full request:', JSON.stringify(request, null, 2));
-    
     const { items } = request;
     const results: BulkPotentialItemWithCubeResponseDto[] = [];
     let totalAverageCost = 0;
@@ -447,33 +438,65 @@ export class PotentialService {
     let totalAverageCubes = 0;
 
     for (const item of items) {
-      console.log('=== DEBUG processing item ===');
-      console.log('Item:', JSON.stringify(item, null, 2));
-      console.log('cubeType value:', item.cubeType);
-      console.log('cubeType type:', typeof item.cubeType);
       
       try {
-        // Ensure cubeType is properly set
-        if (!item.cubeType) {
-          throw new Error(`Missing cubeType for item: ${item.itemName || 'unnamed'}`);
-        }
-        
-        // Build calculation request for each item with its own cube type
-        const calculationRequest: PotentialCalculationRequestDto = {
-          selectedOption: item.selectedOption,
-          itemType: item.itemType, // Client-friendly name
-          cubeType: item.cubeType, // Each item has its own cube type
-          itemLevel: item.itemLevel,
-          isDMT: item.isDMT || false, // Each item can have its own DMT setting
-        };
+        let finalCubeType: CubeType;
+        let result: PotentialCalculationResponseDto;
 
-        const result = this.calculatePotential(calculationRequest);
+        // Smart cube optimization: if cubeType is null, test both and pick the cheaper one
+        if (item.cubeType === null) {
+          // Calculate costs for both red and black cubes
+          const redRequest: PotentialCalculationRequestDto = {
+            selectedOption: item.selectedOption,
+            itemType: item.itemType,
+            cubeType: CubeType.RED,
+            itemLevel: item.itemLevel,
+            isDMT: item.isDMT || false,
+          };
+
+          const blackRequest: PotentialCalculationRequestDto = {
+            selectedOption: item.selectedOption,
+            itemType: item.itemType,
+            cubeType: CubeType.BLACK,
+            itemLevel: item.itemLevel,
+            isDMT: item.isDMT || false,
+          };
+
+          const redResult = this.calculatePotential(redRequest);
+          const blackResult = this.calculatePotential(blackRequest);
+
+          // Choose the cube type with lower average cost
+          if (redResult.averageCost <= blackResult.averageCost) {
+            finalCubeType = CubeType.RED;
+            result = redResult;
+          } else {
+            finalCubeType = CubeType.BLACK;
+            result = blackResult;
+          }
+        } else {
+          // Use specified cube type
+          if (!item.cubeType) {
+            throw new Error(`Missing cubeType for item: ${item.itemName || 'unnamed'}`);
+          }
+          
+          finalCubeType = item.cubeType;
+          
+          const calculationRequest: PotentialCalculationRequestDto = {
+            selectedOption: item.selectedOption,
+            itemType: item.itemType,
+            cubeType: item.cubeType,
+            itemLevel: item.itemLevel,
+            isDMT: item.isDMT || false,
+          };
+
+          result = this.calculatePotential(calculationRequest);
+        }
         
         results.push({
           itemType: item.itemType,
           itemLevel: item.itemLevel,
           selectedOption: item.selectedOption,
-          cubeType: item.cubeType,
+          cubeType: finalCubeType, // Use the final chosen cube type (optimized or specified)
           isDMT: item.isDMT,
           itemName: item.itemName,
           result,
@@ -490,7 +513,7 @@ export class PotentialService {
           itemType: item.itemType,
           itemLevel: item.itemLevel,
           selectedOption: item.selectedOption,
-          cubeType: item.cubeType,
+          cubeType: item.cubeType || CubeType.RED, // Fallback to RED if null and error occurred
           isDMT: item.isDMT,
           itemName: item.itemName,
           result: undefined,
