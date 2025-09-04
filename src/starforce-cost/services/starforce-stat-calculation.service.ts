@@ -286,7 +286,7 @@ export class StarforceStatCalculationService {
     }
 
     // Try both 'type' (database field) and 'itemType' (DTO field)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
     const equipmentType: string =
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       typeof item.type === 'string'
