@@ -58,7 +58,7 @@ const INPUT_CATEGORY_MAP: Record<keyof PotentialInput, PotentialCategory[]> = {
 export class PotentialCalculationService {
   // Convert item type for cube data access (matches JavaScript convertItemType)
   private convertItemType(itemType: ItemType): string {
-    if (itemType === ItemType.ACCESSORY) {
+    if (itemType === ItemType.ACCESSORY || itemType === ItemType.PENDANT || itemType === ItemType.RING) {
       return 'ring';
     } else if (itemType === ItemType.BADGE) {
       return 'heart';
