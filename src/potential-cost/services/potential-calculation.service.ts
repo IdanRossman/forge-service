@@ -58,12 +58,60 @@ const INPUT_CATEGORY_MAP: Record<keyof PotentialInput, PotentialCategory[]> = {
 export class PotentialCalculationService {
   // Convert item type for cube data access (matches JavaScript convertItemType)
   private convertItemType(itemType: ItemType): string {
-    if (itemType === ItemType.ACCESSORY || itemType === ItemType.PENDANT || itemType === ItemType.RING) {
-      return 'ring';
-    } else if (itemType === ItemType.BADGE) {
-      return 'heart';
-    } else {
-      return itemType;
+    // Map ItemType enum to cube data keys
+    switch (itemType) {
+      case ItemType.ACCESSORY:
+      case ItemType.PENDANT:
+      case ItemType.RING:
+      case ItemType.EARRINGS:
+      case ItemType.EYE:
+      case ItemType.FACE:
+        return 'ring';
+      
+      case ItemType.BADGE:
+        return 'heart';
+      
+      case ItemType.ARMOR:
+        return 'top';
+      
+      case ItemType.HAT:
+        return 'hat';
+      
+      case ItemType.TOP:
+        return 'top';
+      
+      case ItemType.BOTTOM:
+        return 'bottom';
+      
+      case ItemType.SHOES:
+        return 'shoes';
+      
+      case ItemType.GLOVES:
+        return 'gloves';
+      
+      case ItemType.CAPE:
+        return 'cape';
+      
+      case ItemType.SHOULDER:
+        return 'shoulder';
+      
+      case ItemType.BELT:
+        return 'belt';
+      
+      case ItemType.WEAPON:
+        return 'weapon';
+      
+      case ItemType.SECONDARY:
+        return 'secondary';
+      
+      case ItemType.EMBLEM:
+        return 'emblem';
+      
+      case ItemType.HEART:
+        return 'heart';
+      
+      default:
+        return itemType.toLowerCase();
     }
   }
 
