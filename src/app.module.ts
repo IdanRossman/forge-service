@@ -5,6 +5,8 @@ import { PotentialCostModule } from './potential-cost';
 import { DatabaseModule } from './database';
 import { EquipmentModule } from './equipment/equipment.module';
 import { TemplatesModule } from './templates/templates.module';
+import { CharactersModule } from './characters/characters.module';
+import { CharacterEquipmentModule } from './character-equipment/character-equipment.module';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { TemplatesModule } from './templates/templates.module';
     PotentialCostModule,
     EquipmentModule,
     TemplatesModule,
+    CharactersModule,
+    CharacterEquipmentModule,
   ],
   controllers: [AppController],
   providers: [],

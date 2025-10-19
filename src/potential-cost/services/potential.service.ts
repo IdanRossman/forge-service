@@ -14,7 +14,11 @@ import {
   BulkPotentialItemWithCubeResponseDto,
   DropdownOptionGroup,
 } from '../contracts/potential-calculation.dto';
-import { ItemType, PotentialTier, CubeType } from '../contracts/potential-enums';
+import {
+  ItemType,
+  PotentialTier,
+  CubeType,
+} from '../contracts/potential-enums';
 import { PotentialCalculationService } from './potential-calculation.service';
 import { PotentialCostService } from './potential-cost.service';
 import { CubeRatesDataService } from './cube-rates-data.service';
@@ -385,7 +389,7 @@ export class PotentialService {
         };
 
         const result = this.calculatePotential(calculationRequest);
-        
+
         results.push({
           itemType: item.itemType,
           itemLevel: item.itemLevel,
@@ -409,7 +413,7 @@ export class PotentialService {
           result: null,
           error: (error as Error).message,
         });
-        
+
         console.error(
           `Bulk calculation failed for item ${item.itemName || 'unnamed'}: ${(error as Error).message}`,
         );
@@ -438,7 +442,6 @@ export class PotentialService {
     let totalAverageCubes = 0;
 
     for (const item of items) {
-      
       try {
         let finalCubeType: CubeType;
         let result: PotentialCalculationResponseDto;
@@ -476,11 +479,13 @@ export class PotentialService {
         } else {
           // Use specified cube type
           if (!item.cubeType) {
-            throw new Error(`Missing cubeType for item: ${item.itemName || 'unnamed'}`);
+            throw new Error(
+              `Missing cubeType for item: ${item.itemName || 'unnamed'}`,
+            );
           }
-          
+
           finalCubeType = item.cubeType;
-          
+
           const calculationRequest: PotentialCalculationRequestDto = {
             selectedOption: item.selectedOption,
             itemType: item.itemType,
@@ -491,7 +496,7 @@ export class PotentialService {
 
           result = this.calculatePotential(calculationRequest);
         }
-        
+
         results.push({
           itemType: item.itemType,
           itemLevel: item.itemLevel,
@@ -519,7 +524,7 @@ export class PotentialService {
           result: undefined,
           error: (error as Error).message,
         });
-        
+
         console.error(
           `Bulk calculation with individual cubes failed for item ${item.itemName || 'unnamed'}: ${(error as Error).message}`,
         );
@@ -589,7 +594,7 @@ export class PotentialService {
     };
 
     // Parse percentage-based patterns
-    
+
     // Attack patterns: "21%+ Attack", "24%+ Attack", etc.
     const attackMatch = displayText.match(/^(\d+)%\+\s+Attack$/);
     if (attackMatch) {
@@ -631,11 +636,16 @@ export class PotentialService {
     // Crit damage lines: "1 Line Crit Dmg%", "2 Line Crit Dmg%", etc.
     const lineCritMatch = displayText.match(/^(\d+)\s+Line\s+Crit\s+Dmg%$/);
     if (lineCritMatch) {
-      return { ...defaultInput, lineCritDamage: parseInt(lineCritMatch[1], 10) };
+      return {
+        ...defaultInput,
+        lineCritDamage: parseInt(lineCritMatch[1], 10),
+      };
     }
 
     // Meso lines: "1 Line Mesos Obtained%", etc.
-    const lineMesoMatch = displayText.match(/^(\d+)\s+Line\s+Mesos\s+Obtained%$/);
+    const lineMesoMatch = displayText.match(
+      /^(\d+)\s+Line\s+Mesos\s+Obtained%$/,
+    );
     if (lineMesoMatch) {
       return { ...defaultInput, lineMeso: parseInt(lineMesoMatch[1], 10) };
     }
@@ -649,21 +659,36 @@ export class PotentialService {
     // Combination OR patterns
 
     // Attack or Boss: "1 Line Attack% or Boss%", etc.
-    const lineAttOrBossMatch = displayText.match(/^(\d+)\s+Line\s+Attack%\s+or\s+Boss%$/);
+    const lineAttOrBossMatch = displayText.match(
+      /^(\d+)\s+Line\s+Attack%\s+or\s+Boss%$/,
+    );
     if (lineAttOrBossMatch) {
-      return { ...defaultInput, lineAttOrBoss: parseInt(lineAttOrBossMatch[1], 10) };
+      return {
+        ...defaultInput,
+        lineAttOrBoss: parseInt(lineAttOrBossMatch[1], 10),
+      };
     }
 
     // Attack, Boss, or IED: "1 Line Attack% or Boss% or IED", etc.
-    const lineAttOrBossOrIedMatch = displayText.match(/^(\d+)\s+Line\s+Attack%\s+or\s+Boss%\s+or\s+IED$/);
+    const lineAttOrBossOrIedMatch = displayText.match(
+      /^(\d+)\s+Line\s+Attack%\s+or\s+Boss%\s+or\s+IED$/,
+    );
     if (lineAttOrBossOrIedMatch) {
-      return { ...defaultInput, lineAttOrBossOrIed: parseInt(lineAttOrBossOrIedMatch[1], 10) };
+      return {
+        ...defaultInput,
+        lineAttOrBossOrIed: parseInt(lineAttOrBossOrIedMatch[1], 10),
+      };
     }
 
     // Meso or Drop: "1 Line of Item Drop% or Mesos Obtained%", "2 Lines Involving Item Drop% or Mesos Obtained%", etc.
-    const lineMesoOrDropMatch = displayText.match(/^(\d+)\s+Lines?\s+.*?(Item\s+Drop%|Mesos\s+Obtained%)/);
+    const lineMesoOrDropMatch = displayText.match(
+      /^(\d+)\s+Lines?\s+.*?(Item\s+Drop%|Mesos\s+Obtained%)/,
+    );
     if (lineMesoOrDropMatch) {
-      return { ...defaultInput, lineMesoOrDrop: parseInt(lineMesoOrDropMatch[1], 10) };
+      return {
+        ...defaultInput,
+        lineMesoOrDrop: parseInt(lineMesoOrDropMatch[1], 10),
+      };
     }
 
     // Cooldown patterns: "-2sec+ CD Reduction", "-3sec+ CD Reduction", etc.
@@ -675,7 +700,9 @@ export class PotentialService {
     // Complex combination patterns
 
     // Attack + Boss combinations: "21%+ Attack and 30%+ Boss", etc.
-    const attackBossMatch = displayText.match(/^(\d+)%\+\s+Attack\s+and\s+(\d+)%\+\s+Boss$/);
+    const attackBossMatch = displayText.match(
+      /^(\d+)%\+\s+Attack\s+and\s+(\d+)%\+\s+Boss$/,
+    );
     if (attackBossMatch) {
       return {
         ...defaultInput,
@@ -695,7 +722,9 @@ export class PotentialService {
     }
 
     // Line Attack + Line Boss: "1 Line Attack% + 1 Line Boss%", etc.
-    const lineAttBossMatch = displayText.match(/^(\d+)\s+Line\s+Attack%\s+\+\s+(\d+)\s+Line\s+Boss%$/);
+    const lineAttBossMatch = displayText.match(
+      /^(\d+)\s+Line\s+Attack%\s+\+\s+(\d+)\s+Line\s+Boss%$/,
+    );
     if (lineAttBossMatch) {
       return {
         ...defaultInput,
@@ -705,7 +734,9 @@ export class PotentialService {
     }
 
     // Crit + Stat combinations: "1 Line Crit Dmg% and 1 line Stat", etc.
-    const critStatMatch = displayText.match(/^(\d+)\s+Line\s+Crit\s+Dmg%\s+and\s+(\d+)\s+line\s+Stat$/);
+    const critStatMatch = displayText.match(
+      /^(\d+)\s+Line\s+Crit\s+Dmg%\s+and\s+(\d+)\s+line\s+Stat$/,
+    );
     if (critStatMatch) {
       return {
         ...defaultInput,
@@ -715,24 +746,33 @@ export class PotentialService {
     }
 
     // Meso + Stat combinations: "1 Line Mesos Obtained% and 1 line Stat", etc.
-    const mesoStatMatch = displayText.match(/^1\s+Line\s+Mesos\s+Obtained%\s+and\s+1\s+line\s+Stat$/);
+    const mesoStatMatch = displayText.match(
+      /^1\s+Line\s+Mesos\s+Obtained%\s+and\s+1\s+line\s+Stat$/,
+    );
     if (mesoStatMatch) {
       return { ...defaultInput, lineMeso: 1, lineStat: 1 };
     }
 
     // Drop + Stat combinations: "1 Line Item Drop% and 1 line Stat", etc.
-    const dropStatMatch = displayText.match(/^1\s+Line\s+Item\s+Drop%\s+and\s+1\s+line\s+Stat$/);
+    const dropStatMatch = displayText.match(
+      /^1\s+Line\s+Item\s+Drop%\s+and\s+1\s+line\s+Stat$/,
+    );
     if (dropStatMatch) {
       return { ...defaultInput, lineDrop: 1, lineStat: 1 };
     }
 
     // Meso/Drop + Stat: "1 Line of (Item Drop% or Mesos Obtained%) with 1 line Stat"
-    if (displayText === '1 Line of (Item Drop% or Mesos Obtained%) with 1 line Stat') {
+    if (
+      displayText ===
+      '1 Line of (Item Drop% or Mesos Obtained%) with 1 line Stat'
+    ) {
       return { ...defaultInput, lineMesoOrDrop: 1, lineStat: 1 };
     }
 
     // Cooldown + Stat combinations: "-2sec+ CD Reduction and 1 Line Stat", etc.
-    const cooldownStatMatch = displayText.match(/^-(\d+)sec\+\s+CD\s+Reduction\s+and\s+(\d+)\s+Line\s+Stat$/);
+    const cooldownStatMatch = displayText.match(
+      /^-(\d+)sec\+\s+CD\s+Reduction\s+and\s+(\d+)\s+Line\s+Stat$/,
+    );
     if (cooldownStatMatch) {
       return {
         ...defaultInput,
@@ -742,7 +782,9 @@ export class PotentialService {
     }
 
     // Attack + Useful lines combinations: "1 Line attack with 1 Line Attack% or Boss% or IED", etc.
-    const attackUsefulMatch = displayText.match(/^(\d+)\s+Line\s+attack\s+with\s+(\d+)\s+Line\s+Attack%/);
+    const attackUsefulMatch = displayText.match(
+      /^(\d+)\s+Line\s+attack\s+with\s+(\d+)\s+Line\s+Attack%/,
+    );
     if (attackUsefulMatch) {
       return {
         ...defaultInput,
@@ -849,12 +891,19 @@ export class PotentialService {
     };
 
     // Generate options based on item type (following JavaScript updateDesiredStatsOptions logic)
-    if (itemType === ItemType.WEAPON || itemType === ItemType.SECONDARY || itemType === ItemType.EMBLEM) {
+    if (
+      itemType === ItemType.WEAPON ||
+      itemType === ItemType.SECONDARY ||
+      itemType === ItemType.EMBLEM
+    ) {
       // Weapons get attack options (addCommonWSEOptions)
       const prime = getPrimeLineValue(itemLevel, desiredTier);
       const threeLineOptionAmounts = get3LAtkOptionAmounts(prime);
       const twoLineOptionAmounts = get2LAtkOptionAmounts(prime);
-      const attackOptionsAmounts = [...twoLineOptionAmounts, ...threeLineOptionAmounts];
+      const attackOptionsAmounts = [
+        ...twoLineOptionAmounts,
+        ...threeLineOptionAmounts,
+      ];
 
       // Attack percentage options
       options.push({
@@ -875,7 +924,8 @@ export class PotentialService {
       });
 
       // Hide boss for emblem or epic tier
-      const showBoss = itemType !== ItemType.EMBLEM && desiredTier >= PotentialTier.UNIQUE;
+      const showBoss =
+        itemType !== ItemType.EMBLEM && desiredTier >= PotentialTier.UNIQUE;
       const shortAnyText = `(Attack${showBoss ? '/Boss' : ''}/IED)`;
       const longAnyText = `Attack% ${showBoss ? 'or Boss% ' : ''}or IED`;
 
@@ -941,16 +991,18 @@ export class PotentialService {
               value: `percAtt+${pn}&percBoss+30`,
               displayText: `${pn}%+ Attack and 30%+ Boss`,
             },
-            ...(desiredTier === PotentialTier.LEGENDARY ? [
-              {
-                value: `percAtt+${pn}&percBoss+35`,
-                displayText: `${pn}%+ Attack and 35%+ Boss`,
-              },
-              {
-                value: `percAtt+${pn}&percBoss+40`,
-                displayText: `${pn}%+ Attack and 40%+ Boss`,
-              },
-            ] : []),
+            ...(desiredTier === PotentialTier.LEGENDARY
+              ? [
+                  {
+                    value: `percAtt+${pn}&percBoss+35`,
+                    displayText: `${pn}%+ Attack and 35%+ Boss`,
+                  },
+                  {
+                    value: `percAtt+${pn}&percBoss+40`,
+                    displayText: `${pn}%+ Attack and 40%+ Boss`,
+                  },
+                ]
+              : []),
             {
               value: `percAtt+${pp}&percBoss+30`,
               displayText: `${pp}%+ Attack and 30%+ Boss`,
@@ -979,7 +1031,11 @@ export class PotentialService {
       }
     } else {
       // Non-weapons get stat options (addNormalStatOptions)
-      const primeLineValue = getPrimeLineValue(itemLevel, desiredTier, 'normal');
+      const primeLineValue = getPrimeLineValue(
+        itemLevel,
+        desiredTier,
+        'normal',
+      );
       const statAmounts = get3LStatOptionAmounts(primeLineValue);
 
       options.push({
@@ -992,7 +1048,10 @@ export class PotentialService {
     }
 
     // Add item-specific options
-    if (itemType === ItemType.GLOVES && desiredTier === PotentialTier.LEGENDARY) {
+    if (
+      itemType === ItemType.GLOVES &&
+      desiredTier === PotentialTier.LEGENDARY
+    ) {
       // Crit damage options
       options.push({
         label: 'Crit Damage',
@@ -1000,29 +1059,59 @@ export class PotentialService {
           { value: 'lineCritDamage+1', displayText: '1 Line Crit Dmg%' },
           { value: 'lineCritDamage+2', displayText: '2 Line Crit Dmg%' },
           { value: 'lineCritDamage+3', displayText: '3 Line Crit Dmg%' },
-          { value: 'lineCritDamage+1&lineStat+1', displayText: '1 Line Crit Dmg% and 1 line Stat' },
-          { value: 'lineCritDamage+1&lineStat+2', displayText: '1 Line Crit Dmg% and 2 line Stat' },
-          { value: 'lineCritDamage+2&lineStat+1', displayText: '2 Line Crit Dmg% and 1 line Stat' },
+          {
+            value: 'lineCritDamage+1&lineStat+1',
+            displayText: '1 Line Crit Dmg% and 1 line Stat',
+          },
+          {
+            value: 'lineCritDamage+1&lineStat+2',
+            displayText: '1 Line Crit Dmg% and 2 line Stat',
+          },
+          {
+            value: 'lineCritDamage+2&lineStat+1',
+            displayText: '2 Line Crit Dmg% and 1 line Stat',
+          },
         ],
       });
     }
 
-    if ((itemType === ItemType.ACCESSORY || itemType === ItemType.RING || itemType === ItemType.PENDANT) && desiredTier === PotentialTier.LEGENDARY) {
+    if (
+      (itemType === ItemType.ACCESSORY ||
+        itemType === ItemType.RING ||
+        itemType === ItemType.PENDANT) &&
+      desiredTier === PotentialTier.LEGENDARY
+    ) {
       // Drop/Meso options
       options.push({
         label: 'Drop/Meso',
         options: [
           { value: 'lineMeso+1', displayText: '1 Line Mesos Obtained%' },
           { value: 'lineDrop+1', displayText: '1 Line Item Drop%' },
-          { value: 'lineMesoOrDrop+1', displayText: '1 Line of Item Drop% or Mesos Obtained%' },
+          {
+            value: 'lineMesoOrDrop+1',
+            displayText: '1 Line of Item Drop% or Mesos Obtained%',
+          },
           { value: 'lineMeso+2', displayText: '2 Line Mesos Obtained%' },
           { value: 'lineDrop+2', displayText: '2 Line Item Drop%' },
-          { value: 'lineMesoOrDrop+2', displayText: '2 Lines Involving Item Drop% or Mesos Obtained%' },
+          {
+            value: 'lineMesoOrDrop+2',
+            displayText: '2 Lines Involving Item Drop% or Mesos Obtained%',
+          },
           { value: 'lineMeso+3', displayText: '3 Line Mesos Obtained%' },
           { value: 'lineDrop+3', displayText: '3 Line Drop%' },
-          { value: 'lineMeso+1&lineStat+1', displayText: '1 Line Mesos Obtained% and 1 line Stat' },
-          { value: 'lineDrop+1&lineStat+1', displayText: '1 Line Item Drop% and 1 line Stat' },
-          { value: 'lineMesoOrDrop+1&lineStat+1', displayText: '1 Line of (Item Drop% or Mesos Obtained%) with 1 line Stat' },
+          {
+            value: 'lineMeso+1&lineStat+1',
+            displayText: '1 Line Mesos Obtained% and 1 line Stat',
+          },
+          {
+            value: 'lineDrop+1&lineStat+1',
+            displayText: '1 Line Item Drop% and 1 line Stat',
+          },
+          {
+            value: 'lineMesoOrDrop+1&lineStat+1',
+            displayText:
+              '1 Line of (Item Drop% or Mesos Obtained%) with 1 line Stat',
+          },
         ],
       });
     }
@@ -1037,10 +1126,22 @@ export class PotentialService {
           { value: 'secCooldown+4', displayText: '-4sec+ CD Reduction' },
           { value: 'secCooldown+5', displayText: '-5sec+ CD Reduction' },
           { value: 'secCooldown+6', displayText: '-6sec+ CD Reduction' },
-          { value: 'secCooldown+2&lineStat+1', displayText: '-2sec+ CD Reduction and 1 Line Stat' },
-          { value: 'secCooldown+2&lineStat+2', displayText: '-2sec+ CD Reduction and 2 Line Stat' },
-          { value: 'secCooldown+3&lineStat+1', displayText: '-3sec+ CD Reduction and 1 Line Stat' },
-          { value: 'secCooldown+4&lineStat+1', displayText: '-4sec+ CD Reduction and 1 Line Stat' },
+          {
+            value: 'secCooldown+2&lineStat+1',
+            displayText: '-2sec+ CD Reduction and 1 Line Stat',
+          },
+          {
+            value: 'secCooldown+2&lineStat+2',
+            displayText: '-2sec+ CD Reduction and 2 Line Stat',
+          },
+          {
+            value: 'secCooldown+3&lineStat+1',
+            displayText: '-3sec+ CD Reduction and 1 Line Stat',
+          },
+          {
+            value: 'secCooldown+4&lineStat+1',
+            displayText: '-4sec+ CD Reduction and 1 Line Stat',
+          },
         ],
       });
     }
