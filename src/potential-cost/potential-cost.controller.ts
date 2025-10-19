@@ -147,13 +147,15 @@ export class PotentialCostController {
 
   @Post('bulk-calculate-individual-cubes')
   @ApiOperation({
-    summary: 'Calculate multiple potential scenarios with individual cube types',
+    summary:
+      'Calculate multiple potential scenarios with individual cube types',
     description:
       'Calculate costs and probabilities for multiple potential combinations where each item can use a different cube type and DMT setting',
   })
   @ApiResponse({
     status: 200,
-    description: 'Bulk potential calculations with individual cubes completed successfully',
+    description:
+      'Bulk potential calculations with individual cubes completed successfully',
     type: BulkPotentialCalculationWithIndividualCubesResponseDto,
   })
   @ApiResponse({
@@ -173,15 +175,21 @@ export class PotentialCostController {
       console.log('Request type:', typeof request);
       console.log('Items array:', request.items);
       console.log('Items length:', request.items?.length);
-      
+
       if (request.items && request.items.length > 0) {
         console.log('First item:', JSON.stringify(request.items[0], null, 2));
         console.log('First item cubeType:', request.items[0].cubeType);
-        console.log('First item cubeType type:', typeof request.items[0].cubeType);
+        console.log(
+          'First item cubeType type:',
+          typeof request.items[0].cubeType,
+        );
       }
       console.log('==========================================');
 
-      const results = this.potentialService.calculateBulkPotentialWithIndividualCubes(request);
+      const results =
+        this.potentialService.calculateBulkPotentialWithIndividualCubes(
+          request,
+        );
 
       return results;
     } catch (error) {

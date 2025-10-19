@@ -49,6 +49,29 @@ export interface EquipmentTemplate {
   pocket_id?: number;
 }
 
+export interface Character {
+  id: string;
+  user_id: string;
+  name: string;
+  job: string;
+  level?: number;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+export interface CharacterEquipment {
+  id: string;
+  character_id: string;
+  slot_name: string;
+  equipment_id: number;
+  current_starforce?: number;
+  target_starforce?: number;
+  current_potential?: string;
+  target_potential?: string;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
 @Injectable()
 export class SupabaseService {
   private supabase: SupabaseClient;
@@ -262,5 +285,225 @@ export class SupabaseService {
 
     if (error) throw error;
     return (data as Equipment[]) || [];
+  }
+
+  // Character methods
+  async getAllCharacters(userId: string): Promise<Character[]> {
+    const { data, error } = await this.supabase
+      .from('characters')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data as Character[]) || [];
+  }
+
+  async getCharacterById(id: string): Promise<Character | null> {
+    const { data, error } = await this.supabase
+      .from('characters')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
+      throw error;
+    }
+    return data as Character | null;
+  }
+
+  async createCharacter(
+    character: Omit<Character, 'id' | 'created_at' | 'updated_at'>,
+  ): Promise<Character> {
+    const { data, error } = await this.supabase
+      .from('characters')
+      .insert(character)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to create character');
+    return data as Character;
+  }
+
+  async updateCharacter(
+    id: string,
+    character: Partial<Omit<Character, 'id' | 'user_id'>>,
+  ): Promise<Character> {
+    const { data, error } = await this.supabase
+      .from('characters')
+      .update(character)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to update character');
+    return data as Character;
+  }
+
+  async deleteCharacter(id: string): Promise<boolean> {
+    const { error } = await this.supabase
+      .from('characters')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  }
+
+  // Character Equipment methods
+  async getCharacterEquipment(
+    characterId: string,
+  ): Promise<CharacterEquipment[]> {
+    const { data, error } = await this.supabase
+      .from('character_equipment')
+      .select(
+        `
+        *,
+        equipment:equipment_id (
+          id,
+          name,
+          type,
+          set,
+          job,
+          class,
+          level,
+          base_attack,
+          starforceable,
+          maplestory_io_id,
+          storage_url
+        )
+      `,
+      )
+      .eq('character_id', characterId)
+      .order('slot_name');
+
+    if (error) throw error;
+    return (data as CharacterEquipment[]) || [];
+  }
+
+  async getCharacterEquipmentBySlot(
+    characterId: string,
+    slotName: string,
+  ): Promise<CharacterEquipment | null> {
+    const { data, error } = await this.supabase
+      .from('character_equipment')
+      .select(
+        `
+        *,
+        equipment:equipment_id (
+          id,
+          name,
+          type,
+          set,
+          job,
+          class,
+          level,
+          base_attack,
+          starforceable,
+          maplestory_io_id,
+          storage_url
+        )
+      `,
+      )
+      .eq('character_id', characterId)
+      .eq('slot_name', slotName)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
+      throw error;
+    }
+    return data as CharacterEquipment | null;
+  }
+
+  async createCharacterEquipment(
+    equipment: Omit<CharacterEquipment, 'id' | 'created_at' | 'updated_at'>,
+  ): Promise<CharacterEquipment> {
+    const { data, error } = await this.supabase
+      .from('character_equipment')
+      .insert(equipment)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to create character equipment');
+    return data as CharacterEquipment;
+  }
+
+  async bulkCreateCharacterEquipment(
+    equipmentList: Omit<
+      CharacterEquipment,
+      'id' | 'created_at' | 'updated_at'
+    >[],
+  ): Promise<CharacterEquipment[]> {
+    const { data, error } = await this.supabase
+      .from('character_equipment')
+      .insert(equipmentList)
+      .select();
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to bulk create character equipment');
+    return data as CharacterEquipment[];
+  }
+
+  async upsertCharacterEquipment(
+    equipment: Omit<CharacterEquipment, 'id' | 'created_at' | 'updated_at'>,
+  ): Promise<CharacterEquipment> {
+    const { data, error } = await this.supabase
+      .from('character_equipment')
+      .upsert(equipment, {
+        onConflict: 'character_id,slot_name', // Unique constraint
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to upsert character equipment');
+    return data as CharacterEquipment;
+  }
+
+  async bulkUpsertCharacterEquipment(
+    equipmentList: Omit<
+      CharacterEquipment,
+      'id' | 'created_at' | 'updated_at'
+    >[],
+  ): Promise<CharacterEquipment[]> {
+    const { data, error } = await this.supabase
+      .from('character_equipment')
+      .upsert(equipmentList, {
+        onConflict: 'character_id,slot_name',
+      })
+      .select();
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to bulk upsert character equipment');
+    return data as CharacterEquipment[];
+  }
+
+  async deleteCharacterEquipment(
+    characterId: string,
+    slotName: string,
+  ): Promise<boolean> {
+    const { error } = await this.supabase
+      .from('character_equipment')
+      .delete()
+      .eq('character_id', characterId)
+      .eq('slot_name', slotName);
+
+    if (error) throw error;
+    return true;
+  }
+
+  async deleteAllCharacterEquipment(characterId: string): Promise<boolean> {
+    const { error } = await this.supabase
+      .from('character_equipment')
+      .delete()
+      .eq('character_id', characterId);
+
+    if (error) throw error;
+    return true;
   }
 }
